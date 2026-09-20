@@ -20,9 +20,9 @@ The current framework provides:
 - balanced Left/Right depth-judgment trials,
 - reaction-time and accuracy logging,
 - CSV event/depth/Tetris summary logging,
-- central experiment configuration.
+- central experiment configuration,\n- a playable baseline Tetris implementation,\n- deterministic Sequence A/B generation,\n- timed Tetris performance logging,\n- desktop keyboard input for pre-device testing.
 
-The next implementation layer will add the stationary Tetris game and Magic Leap input/anchor integration.
+The stationary Tetris task is now included. Magic Leap device-specific input/anchor integration remains intentionally deferred until the exact headset model is confirmed.
 
 ## Planned experiment flow
 
@@ -126,3 +126,4 @@ Before finalizing Low/High VAC distances, confirm:
 - whether focal-plane switching occurs,
 - comfortable virtual-depth range,
 - whether the final experiment should keep both VAC levels on the same conflict-direction side of the focal plane.
+\n\n## Scene wiring\n\nSee `Docs/UNITY_SETUP.md` for the current Unity hierarchy, component wiring, desktop test controls, and experiment-flow setup.\n
