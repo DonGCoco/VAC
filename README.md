@@ -8,7 +8,7 @@ Group 6 experimental codebase for studying whether different levels of vergence�
 
 ## Current scope
 
-This first version intentionally does **not** depend on Magic Leap 1 or Magic Leap 2 SDK-specific APIs. The exact headset model and optical focal properties are still to be confirmed.
+The target headset is now confirmed as **Magic Leap 2**. The experiment will use the Magic Leap OpenXR workflow. Final Low/High VAC distances remain pilot/supervisor parameters rather than hard-coded values.
 
 The current framework provides:
 
@@ -22,17 +22,17 @@ The current framework provides:
 - CSV event/depth/Tetris summary logging,
 - central experiment configuration,\n- a playable baseline Tetris implementation,\n- deterministic Sequence A/B generation,\n- timed Tetris performance logging,\n- desktop keyboard input for pre-device testing.
 
-The stationary Tetris task is now included. Magic Leap device-specific input/anchor integration remains intentionally deferred until the exact headset model is confirmed.
+The stationary Tetris task is included. Magic Leap 2 is now the confirmed target device; OpenXR controller/rig integration is the next device-specific layer.
 
 ## Planned experiment flow
 
 ```
 Participant setup
-→ Magic Leap setup
+→ Baseline questionnaire before headset use
+→ Magic Leap 2 setup
 → Training mode
    → Tetris training
    → 3–5 depth-judgment practice trials
-→ Headset-off baseline questionnaire
 → Condition 1
    → Pre depth judgment
    → 15–20 min Tetris
@@ -127,3 +127,7 @@ Before finalizing Low/High VAC distances, confirm:
 - comfortable virtual-depth range,
 - whether the final experiment should keep both VAC levels on the same conflict-direction side of the focal plane.
 \n\n## Scene wiring\n\nSee `Docs/UNITY_SETUP.md` for the current Unity hierarchy, component wiring, desktop test controls, and experiment-flow setup.\n
+
+## Magic Leap 2
+
+The target device is Magic Leap 2. See `Docs/MAGIC_LEAP_2_SETUP.md` for the OpenXR setup and the important distinction between optical focal plane and the rendering `Focus Distance` setting.
