@@ -1,6 +1,6 @@
 # Unity Scene Wiring
 
-This document describes the minimum scene setup for the current framework.
+This document describes the minimum scene setup for the current Magic Leap 2 framework.
 
 ## 1. Create ExperimentConfig
 
@@ -8,7 +8,7 @@ Create:
 
 `Assets → Create → VAC Experiment → Experiment Config`
 
-Do **not** treat the default Low/High distances as final experimental values. They are placeholders until the Magic Leap model and focal properties are confirmed.
+Do **not** treat the default Low/High distances as final experimental values. Magic Leap 2 is confirmed, but the experimental Low/High vergence distances still need supervisor confirmation and pilot testing.
 
 Recommended pilot-editable fields:
 
@@ -35,7 +35,7 @@ VACExperiment
 │   ├── TetrisSequenceManager
 │   └── KeyboardDebugInput
 │
-├── XR / Magic Leap Rig
+├── Magic Leap 2 ML Rig / XR Origin
 │   └── ViewerCamera
 │
 ├── VACContentRoot
