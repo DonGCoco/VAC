@@ -8,7 +8,6 @@ namespace VACExperiment
     public enum DepthPhase
     {
         Practice,
-        Pre,
         Post
     }
 
@@ -38,17 +37,26 @@ namespace VACExperiment
         private int trialIndex;
         private float stimulusOnsetTime;
 
+        private Vector3 leftReferenceScale;
+        private Vector3 rightReferenceScale;
+
+        private void Awake()
+        {
+            if (leftTarget != null)
+                leftReferenceScale = leftTarget.localScale;
+
+            if (rightTarget != null)
+                rightReferenceScale = rightTarget.localScale;
+        }
+
         public void BeginPractice(VacCondition practiceCondition)
         {
             BeginBlock(practiceCondition, DepthPhase.Practice, config.practiceDepthTrials);
         }
 
-        public void BeginFormal(VacCondition formalCondition, DepthPhase formalPhase)
+        public void BeginFormal(VacCondition exposureCondition)
         {
-            if (formalPhase == DepthPhase.Practice)
-                throw new ArgumentException("Use BeginPractice for practice trials.");
-
-            BeginBlock(formalCondition, formalPhase, config.formalDepthTrials);
+            BeginBlock(exposureCondition, DepthPhase.Post, config.formalDepthTrials);
         }
 
         private void BeginBlock(VacCondition newCondition, DepthPhase newPhase, int trialCount)
@@ -59,9 +67,19 @@ namespace VACExperiment
                 return;
             }
 
+            if (config.depthDifferenceMeters >= config.depthTaskReferenceDistanceMeters * 2f)
+            {
+                Debug.LogError("Depth difference is too large for the configured reference distance.");
+                return;
+            }
+
             condition = newCondition;
             phase = newPhase;
-            referenceDepth = config.GetDistance(condition);
+
+            // IMPORTANT: the depth-test reference distance is identical after both VAC conditions.
+            // Otherwise the outcome task itself would change between conditions.
+            referenceDepth = config.depthTaskReferenceDistanceMeters;
+
             closerSides = BuildBalancedOrder(trialCount);
             trialIndex = 0;
             IsRunning = true;
@@ -124,29 +142,46 @@ namespace VACExperiment
                 flatForward = viewer.forward.normalized;
 
             Vector3 right = Vector3.Cross(Vector3.up, flatForward).normalized;
-            Vector3 center = viewer.position + flatForward * referenceDepth;
             float halfSeparation = config.targetHorizontalSeparationMeters * 0.5f;
+            float halfDepthDifference = config.depthDifferenceMeters * 0.5f;
 
-            float nearDepth = referenceDepth;
-            float farDepth = referenceDepth + config.depthDifferenceMeters;
+            float nearDepth = referenceDepth - halfDepthDifference;
+            float farDepth = referenceDepth + halfDepthDifference;
 
-            Vector3 leftBase = viewer.position + flatForward *
-                (closerSide == ResponseSide.Left ? nearDepth : farDepth) - right * halfSeparation;
+            float leftDepth = closerSide == ResponseSide.Left ? nearDepth : farDepth;
+            float rightDepth = closerSide == ResponseSide.Right ? nearDepth : farDepth;
 
-            Vector3 rightBase = viewer.position + flatForward *
-                (closerSide == ResponseSide.Right ? nearDepth : farDepth) + right * halfSeparation;
+            leftTarget.position =
+                viewer.position + flatForward * leftDepth - right * halfSeparation;
 
-            leftTarget.position = leftBase;
-            rightTarget.position = rightBase;
+            rightTarget.position =
+                viewer.position + flatForward * rightDepth + right * halfSeparation;
+
+            // Remove apparent-size as an unintended monocular cue.
+            ApplyConstantAngularSize(leftTarget, leftReferenceScale, leftDepth);
+            ApplyConstantAngularSize(rightTarget, rightReferenceScale, rightDepth);
 
             SetTargetsVisible(true);
             stimulusOnsetTime = Time.realtimeSinceStartup;
         }
 
+        private void ApplyConstantAngularSize(
+            Transform target,
+            Vector3 authoredScale,
+            float targetDepthMeters)
+        {
+            float referenceDistance = config.targetReferenceScaleDistanceMeters;
+            float scaleFactor = targetDepthMeters / referenceDistance;
+            target.localScale = authoredScale * scaleFactor;
+        }
+
         private void SetTargetsVisible(bool visible)
         {
-            if (leftTarget != null) leftTarget.gameObject.SetActive(visible);
-            if (rightTarget != null) rightTarget.gameObject.SetActive(visible);
+            if (leftTarget != null)
+                leftTarget.gameObject.SetActive(visible);
+
+            if (rightTarget != null)
+                rightTarget.gameObject.SetActive(visible);
         }
 
         private static List<ResponseSide> BuildBalancedOrder(int count)
@@ -157,12 +192,17 @@ namespace VACExperiment
 
             if (count % 2 != 0)
             {
-                if (UnityEngine.Random.value < 0.5f) leftCount++;
-                else rightCount++;
+                if (UnityEngine.Random.value < 0.5f)
+                    leftCount++;
+                else
+                    rightCount++;
             }
 
-            for (int i = 0; i < leftCount; i++) list.Add(ResponseSide.Left);
-            for (int i = 0; i < rightCount; i++) list.Add(ResponseSide.Right);
+            for (int i = 0; i < leftCount; i++)
+                list.Add(ResponseSide.Left);
+
+            for (int i = 0; i < rightCount; i++)
+                list.Add(ResponseSide.Right);
 
             for (int i = list.Count - 1; i > 0; i--)
             {

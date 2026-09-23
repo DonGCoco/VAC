@@ -1,67 +1,65 @@
 # Magic Leap 2 Setup for the VAC Experiment
 
-The target headset for this project is **Magic Leap 2**.
+The target headset is **Magic Leap 2** and the project should use the **OpenXR** workflow.
 
-## 1. Recommended Unity workflow
+## 1. Development environment
 
-Use the current Magic Leap **OpenXR** workflow.
+Current project target:
 
-Magic Leap's current documentation recommends:
-
-- Unity 2022.3 LTS or later
+- Unity 6.3 LTS
 - Android Build Support
 - Android SDK & NDK Tools
 - OpenJDK
 - Magic Leap Unity SDK
-- Unity OpenXR Plugin 1.10.0 or later
+- Unity OpenXR Plugin
 - OpenXR enabled for Android
-- Magic Leap 2 Support feature enabled
-- Magic Leap 2 Controller Interaction Profile enabled if the controller is used
 
-The Magic Leap Project Setup Tool can configure most required project settings automatically.
+The Magic Leap Project Setup Tool is the easiest way to apply the required project settings.
 
-## 2. Important distinction: optical focal plane vs Unity Focus Distance
+For Unity 6, make sure **Application Entry Point = Activity only** and GameActivity is disabled.
 
-For this experiment, **do not use the Magic Leap Focus Distance / Stereo Convergence API as the VAC manipulation**.
+## 2. Recommended Android / XR settings
 
-Magic Leap 2 uses a **single fixed optical focal plane** for virtual content.
+Before the first device build, verify:
 
-The Unity/OpenXR "Focus Distance" / "Stereo Convergence" setting is used for visual stabilization / content registration. It changes rendering/reprojection behavior; it does not physically move the headset's optical focal plane.
+- OpenXR provider enabled under Android
+- Magic Leap feature group / Magic Leap 2 Support enabled
+- Magic Leap 2 Controller Interaction Profile enabled if using the controller
+- Vulkan as the graphics API
+- Minimum API Level 29
+- IL2CPP scripting backend
+- x86-64 target architecture
 
-Our VAC manipulation should therefore be implemented by changing the **virtual geometry depth** of the stimulus:
+Use OpenXR Project Validation before building.
 
-- Low VAC: virtual content placed at one vergence distance
-- High VAC: virtual content placed at another vergence distance
+## 3. Optical focal plane vs Focus Distance
 
-while accommodation remains determined by the headset's fixed optical focal plane.
+Do **not** use Magic Leap Focus Distance / Stereo Convergence as the VAC manipulation.
 
-This is what the existing `VACController` is designed to do.
+Magic Leap 2 documentation describes XR content as being viewed through a fixed optical focal plane. The rendering Focus Distance setting is for stabilization / registration and does not physically move that optical focal plane.
 
-## 3. Do not hard-code the final experimental distances yet
+VAC should therefore be manipulated by changing **virtual geometry depth**:
 
-The current distances in `ExperimentConfig` are placeholders.
+- Low VAC = one virtual vergence distance
+- High VAC = another virtual vergence distance
 
-Before formal data collection we still need to confirm the intended Low/High VAC values with the supervisor and pilot test them.
-
-A number around 0.74 m is reported in recent research as the Magic Leap 2 focal plane, but the current Magic Leap developer documentation we checked describes a fixed focal plane without publishing that exact numerical value on the VAC page. Therefore, do not treat 0.74 m as a final experimental constant until it is confirmed for our study.
+The exact optical focal distance used for the study must still be confirmed before calculating the final conflict magnitudes in diopters.
 
 ## 4. Display Zone
 
-Magic Leap 2 uses a Display Zone near boundary to protect users from uncomfortable near content.
+Magic Leap 2's default near Display Zone boundary is 0.37 m.
 
-The default near boundary is 0.37 m.
+Do not change this setting between conditions.
 
-On supported OS versions it can be adjusted down to 0.25 m, but Magic Leap warns that closer content can increase discomfort.
-
-For this study, we should avoid changing this system setting between conditions. Keep it fixed for all participants.
+Avoid choosing a formal stimulus distance below the current safe/approved setup simply to create a larger conflict. Final distances must be agreed with the supervisor and checked in the pilot.
 
 ## 5. Scene setup
 
-Use the Magic Leap ML Rig / XR Origin sample as the headset rig.
+Use the Magic Leap XR Origin / ML Rig camera as the viewer reference.
 
 Recommended structure:
 
-```
+~~~
 VACExperiment
 ├── Managers
 │   ├── ParticipantManager
@@ -72,86 +70,78 @@ VACExperiment
 │   ├── DepthJudgmentManager
 │   ├── TetrisManager
 │   └── TetrisSequenceManager
-│
-├── ML Rig / XR Origin
+├── XR Origin / ML Rig
 │   └── Main Camera
-│
 ├── VACContentRoot
 │   └── TetrisBoard
-│
 └── DepthTargets
     ├── LeftTarget
     └── RightTarget
-```
+~~~
 
-Assign the ML Rig's Main Camera transform as the `viewer` reference in:
-
-- `VACController`
-- `DepthJudgmentManager`
+Assign Main Camera as the viewer in VACController and DepthJudgmentManager.
 
 ## 6. Controller input
 
-Use the Magic Leap 2 Controller Interaction Profile through OpenXR.
+The experiment only needs a small set of actions.
 
-The experiment only needs a small control set:
+Tetris:
 
-### Tetris
-
-- Left / Right
+- Left
+- Right
 - Rotate
 - Soft drop
 - Hard drop
 
-### Depth judgment
+Depth judgment:
 
 - Left response
 - Right response
 
-The experiment logic already exposes public methods for these actions. The ML2 input layer only needs to bind OpenXR input actions to those methods.
+The experiment code already exposes public methods for these actions. The Magic Leap input layer only needs to bind OpenXR actions to them.
 
 ## 7. Spatial behavior
 
-The content should be positioned once relative to the participant at the start of a condition and then remain spatially fixed.
+The Tetris content should be positioned once at condition start and then remain spatially fixed.
 
-Do not continuously parent the Tetris board to the headset camera.
-
-This reduces the chance of introducing an additional head-locked visual cue into the experiment.
+Do not continuously parent the board to the headset camera.
 
 ## 8. Constant apparent size
 
-When virtual depth changes, world-space scale must also change so the Tetris board subtends approximately the same visual angle in Low and High VAC conditions.
+When virtual Tetris depth changes, board world scale must change proportionally so the board subtends approximately the same visual angle.
 
-The existing `ApparentSizeController` performs this proportional scaling.
-
-This is important because otherwise Tetris performance could differ simply because one board appears larger.
+The post-exposure depth task also compensates target size according to target depth so that participants cannot solve it simply by selecting the apparently larger target.
 
 ## 9. Questionnaires
 
-All questionnaires are completed **outside the headset**.
+All SSQ / QoE questionnaires are completed outside the headset.
 
-Recommended order:
+Current flow:
 
-```
-Participant information
-→ Baseline questionnaire BEFORE putting on the headset
-→ Magic Leap 2 setup
-→ Short in-headset training
-→ Condition 1
-→ Headset-off post-condition questionnaire
+~~~
+Initial SSQ
+→ Warm-up
+→ Pre-Condition 1 SSQ
+→ Condition 1 Tetris
+→ Depth task
+→ Post-Condition 1 SSQ
 → Recovery
-→ Condition 2
-→ Headset-off post-condition questionnaire
-```
-
-A short verbal comfort/visibility check may be performed after headset setup and training, but it is not part of the formal questionnaire dataset.
+→ Pre-Condition 2 SSQ
+→ Condition 2 Tetris
+→ Depth task
+→ Post-Condition 2 SSQ
+~~~
 
 ## 10. Remaining study decisions
 
 Still to confirm before formal data collection:
 
-- exact Low VAC vergence distance
-- exact High VAC vergence distance
-- whether both conditions remain on the same side of the optical focal plane
-- formal Depth Judgment reference depth and disparity
-- Tetris duration after pilot testing
-- number of formal Depth Judgment trials
+- optical focal distance used for the study
+- exact Low VAC virtual distance
+- exact High VAC virtual distance
+- whether both conditions remain on the same side of the focal plane
+- final Tetris exposure duration
+- final depth-task reference depth and depth difference
+- final number of depth trials
+- recovery rule after pilot testing
+- QoE questionnaire requested by Martin

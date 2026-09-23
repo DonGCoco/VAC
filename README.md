@@ -1,56 +1,86 @@
-# VAC — Magic Leap Experiment Framework
+# VAC — Magic Leap 2 Experiment Framework
 
-Group 6 experimental codebase for studying whether different levels of vergence–accommodation conflict (VAC) affect:
+Group 5 experimental codebase for studying whether different levels of vergence–accommodation conflict (VAC) affect:
 
-1. general task performance (stationary Tetris),
-2. stereoscopic depth-judgment performance, and
-3. subjective visual discomfort (questionnaires are completed outside the headset).
+1. visual / oculomotor discomfort,
+2. post-exposure depth-judgment performance, and
+3. Tetris task-specific performance.
 
-## Current scope
+## Study design
 
-The target headset is now confirmed as **Magic Leap 2**. The experiment will use the Magic Leap OpenXR workflow. Final Low/High VAC distances remain pilot/supervisor parameters rather than hard-coded values.
+- Target device: **Magic Leap 2**
+- Design: **within-subject**
+- Formal sample: **10 participants**
+- Pilot: **4 participants**
+- Conditions: **Low VAC** and **High VAC**
+- Counterbalancing: 5 participants Low → High, 5 participants High → Low
+- Primary symptom outcome: change in **SSQ Oculomotor score**
+- Primary depth outcome: **depth-judgment accuracy**
 
-The current framework provides:
+The exact Low/High virtual distances are deliberately configurable rather than hard-coded. Final distances, exposure duration, depth-task difficulty, and recovery procedure are pilot parameters.
 
-- participant ID based counterbalancing,
-- Low/High VAC distances exposed as Unity Inspector parameters,
-- training vs. formal-experiment state,
-- spatial placement for Low/High VAC content,
-- automatic apparent-size compensation,
-- balanced Left/Right depth-judgment trials,
-- reaction-time and accuracy logging,
-- CSV event/depth/Tetris summary logging,
-- central experiment configuration,\n- a playable baseline Tetris implementation,\n- deterministic Sequence A/B generation,\n- timed Tetris performance logging,\n- desktop keyboard input for pre-device testing.
+## Current formal flow
 
-The stationary Tetris task is included. Magic Leap 2 is now the confirmed target device; OpenXR controller/rig integration is the next device-specific layer.
-
-## Planned experiment flow
-
-```
-Participant setup
-→ Baseline questionnaire before headset use
-→ Magic Leap 2 setup
-→ Training mode
-   → Tetris training
-   → 3–5 depth-judgment practice trials
-→ Condition 1
-   → Pre depth judgment
-   → 15–20 min Tetris
-   → Post depth judgment
-→ Headset-off post-condition questionnaire
+~~~
+Consent + demographics
+→ Initial SSQ (outside headset)
+→ Warm-up / familiarisation
+→ Pre-Condition 1 SSQ (outside headset)
+→ Condition 1: Tetris
+→ Short post-exposure depth-judgment task
+→ Post-Condition 1 SSQ (outside headset)
 → Recovery
-→ Condition 2
-   → Pre depth judgment
-   → 15–20 min Tetris
-   → Post depth judgment
-→ Headset-off post-condition questionnaire
-```
+→ Pre-Condition 2 SSQ (outside headset)
+→ Condition 2: Tetris
+→ Short post-exposure depth-judgment task
+→ Post-Condition 2 SSQ (outside headset)
+~~~
 
-All questionnaires are completed **outside the headset** and matched later using Participant ID.
+Questionnaires remain outside the headset and are matched to Unity data using Participant ID.
+
+## Current framework
+
+The repository currently provides:
+
+- participant-ID based condition/sequence counterbalancing,
+- Low/High virtual distances exposed as Inspector parameters,
+- one-time spatial placement of the Tetris board,
+- automatic apparent-size compensation when viewing distance changes,
+- a playable baseline Tetris implementation,
+- deterministic Sequence A/B generation,
+- timed Tetris performance logging,
+- a short post-exposure depth-judgment task,
+- constant apparent target size in the depth task,
+- balanced Left/Right closer-target trials,
+- reaction-time and accuracy logging,
+- CSV event/depth/Tetris logging,
+- desktop keyboard input for Editor testing.
+
+Magic Leap 2 OpenXR controller bindings and the final Unity scene still need to be wired and device-tested.
+
+## Important experimental controls
+
+### Tetris board
+
+The board is placed at the selected virtual depth once at condition start and remains world-fixed. It should not remain head-locked.
+
+When viewing distance changes, the board is scaled proportionally so that its apparent angular size remains approximately constant.
+
+### Depth task
+
+The depth task uses the **same reference depth in both VAC conditions** so that the test itself does not introduce a second condition difference.
+
+The two targets are scaled according to their individual depths so that apparent target size cannot be used as an easy monocular cue.
+
+### VAC manipulation
+
+Do not use Magic Leap Focus Distance / Stereo Convergence as the VAC manipulation. The manipulation is the virtual geometry depth of the stimulus.
+
+The exact optical focal distance and final VAC magnitudes in diopters must be confirmed before formal data collection.
 
 ## Counterbalancing
 
-The current participant assignment cycles through four combinations:
+The participant assignment cycles through four condition/sequence combinations:
 
 | Participant pattern | Condition 1 | Condition 2 |
 |---|---|---|
@@ -59,44 +89,16 @@ The current participant assignment cycles through four combinations:
 | 3 mod 4 | Low + Sequence B | High + Sequence A |
 | 0 mod 4 | High + Sequence B | Low + Sequence A |
 
-Example: P01, P02, P03, P04.
-
-## Unity setup
-
-1. Create/open a Unity project that targets the confirmed Magic Leap device.
-2. Copy/keep the scripts under `Assets/Scripts/`.
-3. Create an `ExperimentConfig` asset via:
-   `Assets → Create → VAC Experiment → Experiment Config`.
-4. In the Inspector, set:
-   - Low VAC Distance
-   - High VAC Distance
-   - Tetris Duration
-   - Formal Depth Trials
-   - Practice Depth Trials
-   - Depth Difference
-5. Add `ParticipantManager`, `DataLogger`, `VACController`, `DepthJudgmentManager`, and `ExperimentManager` to scene GameObjects and wire references.
-6. Connect Magic Leap input later to the public Left/Right response methods and Tetris controls.
-
-## Why Inspector parameters?
-
-Final VAC distances are not known yet. By exposing them in the Inspector, pilot-test values can be changed without rewriting experiment logic. Example:
-
-```
-Low VAC Distance: 1.0 → 1.2
-High VAC Distance: 2.0 → 2.5
-```
-
-The same applies to Tetris duration, depth difference, and trial counts.
+For P01–P10 this gives 5 Low→High and 5 High→Low participants.
 
 ## Data
 
-CSV files are written under Unity's `Application.persistentDataPath`.
+CSV files are written under Unity's Application.persistentDataPath.
 
-Formal depth trials contain:
+Depth-trial rows include:
 
 - participant ID,
-- VAC condition,
-- Pre/Post phase,
+- exposure condition,
 - trial number,
 - reference depth,
 - depth difference,
@@ -105,7 +107,7 @@ Formal depth trials contain:
 - correctness,
 - reaction time.
 
-Tetris summaries will contain:
+Tetris summaries include:
 
 - participant ID,
 - VAC condition,
@@ -117,17 +119,22 @@ Tetris summaries will contain:
 - average placement time,
 - top-outs.
 
-## Important
+## Setup
 
-Before finalizing Low/High VAC distances, confirm:
+See:
 
-- exact Magic Leap model,
-- optical focal distance/focal planes,
-- whether focal-plane switching occurs,
-- comfortable virtual-depth range,
-- whether the final experiment should keep both VAC levels on the same conflict-direction side of the focal plane.
-\n\n## Scene wiring\n\nSee `Docs/UNITY_SETUP.md` for the current Unity hierarchy, component wiring, desktop test controls, and experiment-flow setup.\n
+- **Docs/BEFORE_FIRST_BUILD.md** — what to check before opening/building the project
+- **Docs/UNITY_SETUP.md** — current Unity hierarchy and component wiring
+- **Docs/MAGIC_LEAP_2_SETUP.md** — Magic Leap 2 / OpenXR setup notes
 
-## Magic Leap 2
+## Still to confirm
 
-The target device is Magic Leap 2. See `Docs/MAGIC_LEAP_2_SETUP.md` for the OpenXR setup and the important distinction between optical focal plane and the rendering `Focus Distance` setting.
+Before formal testing:
+
+- exact Magic Leap 2 optical focal distance used for the study,
+- Low VAC virtual distance,
+- High VAC virtual distance,
+- final Tetris exposure duration,
+- final depth-task difference and number of trials,
+- final recovery rule after the pilot,
+- the QoE questionnaire requested by Martin.

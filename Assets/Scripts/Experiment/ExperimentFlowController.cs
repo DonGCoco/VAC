@@ -13,8 +13,6 @@ namespace VACExperiment
         [SerializeField] private DepthJudgmentManager depthJudgmentManager;
         [SerializeField] private TetrisManager tetrisManager;
 
-        private DepthPhase activeDepthPhase;
-
         private void OnEnable()
         {
             if (depthJudgmentManager != null)
@@ -33,42 +31,48 @@ namespace VACExperiment
                 tetrisManager.onSessionCompleted.RemoveListener(HandleTetrisCompleted);
         }
 
-        // Can be called by a simple UI button.
+        // Step 1: creates the participant session, then pauses for the initial SSQ.
         public void BeginParticipantFromInspector()
         {
             experimentManager.StartParticipant(participantId);
         }
 
+        // Call after the initial SSQ is completed outside the headset.
+        public void ContinueAfterInitialQuestionnaire()
+        {
+            experimentManager.BeginTraining();
+        }
+
+        // Call after the supervised 3–5 minute warm-up/familiarisation.
         public void FinishTraining()
         {
-            experimentManager.FinishTrainingAndPauseForBaselineQuestionnaire();
+            experimentManager.FinishTrainingAndPrepareFirstCondition();
         }
 
-        // Call after the participant completes the baseline questionnaire outside the headset.
-        public void ContinueAfterBaselineQuestionnaire()
+        // Call after the pre-condition SSQ is completed.
+        public void ContinueAfterPreConditionQuestionnaire()
         {
-            experimentManager.BeginFirstCondition();
-            StartPreDepth();
+            experimentManager.BeginCurrentConditionAfterQuestionnaire();
+
+            tetrisManager.BeginSession(
+                experimentManager.GetCurrentCondition(),
+                experimentManager.GetCurrentSequence());
         }
 
-        // Call after the post-condition questionnaire is finished outside the headset.
+        // Call after the post-condition SSQ is completed.
         public void ContinueAfterPostConditionQuestionnaire()
         {
             if (experimentManager.CurrentConditionIndex == 1)
-            {
                 experimentManager.BeginRecovery();
-            }
             else
-            {
                 experimentManager.CompleteExperiment();
-            }
         }
 
-        // Call after recovery is judged sufficient.
+        // Call only after the recovery criterion is satisfied.
+        // This pauses for the Condition 2 pre-condition SSQ.
         public void ContinueAfterRecovery()
         {
-            experimentManager.BeginSecondCondition();
-            StartPreDepth();
+            experimentManager.PrepareSecondConditionAfterRecovery();
         }
 
         public void StartDepthPractice()
@@ -76,42 +80,15 @@ namespace VACExperiment
             depthJudgmentManager.BeginPractice(VacCondition.Low);
         }
 
-        private void StartPreDepth()
+        private void HandleTetrisCompleted()
         {
-            activeDepthPhase = DepthPhase.Pre;
-            experimentManager.MarkPreDepthStarted();
-            depthJudgmentManager.BeginFormal(
-                experimentManager.GetCurrentCondition(),
-                DepthPhase.Pre);
-        }
-
-        private void StartPostDepth()
-        {
-            activeDepthPhase = DepthPhase.Post;
             experimentManager.MarkPostDepthStarted();
-            depthJudgmentManager.BeginFormal(
-                experimentManager.GetCurrentCondition(),
-                DepthPhase.Post);
+            depthJudgmentManager.BeginFormal(experimentManager.GetCurrentCondition());
         }
 
         private void HandleDepthBlockCompleted()
         {
-            if (activeDepthPhase == DepthPhase.Pre)
-            {
-                experimentManager.MarkTetrisStarted();
-                tetrisManager.BeginSession(
-                    experimentManager.GetCurrentCondition(),
-                    experimentManager.GetCurrentSequence());
-            }
-            else if (activeDepthPhase == DepthPhase.Post)
-            {
-                experimentManager.PauseForPostConditionQuestionnaire();
-            }
-        }
-
-        private void HandleTetrisCompleted()
-        {
-            StartPostDepth();
+            experimentManager.PauseForPostConditionQuestionnaire();
         }
     }
 }

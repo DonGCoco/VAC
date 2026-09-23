@@ -5,9 +5,9 @@ namespace VACExperiment
     public enum ExperimentPhase
     {
         Idle,
+        InitialQuestionnairePause,
         Training,
-        BaselineQuestionnairePause,
-        PreDepth,
+        PreConditionQuestionnairePause,
         Tetris,
         PostDepth,
         PostConditionQuestionnairePause,
@@ -22,7 +22,7 @@ namespace VACExperiment
         [SerializeField] private VACController vacController;
 
         public ExperimentPhase Phase { get; private set; } = ExperimentPhase.Idle;
-        public int CurrentConditionIndex { get; private set; } = 0;
+        public int CurrentConditionIndex { get; private set; }
 
         private ConditionAssignment assignment;
 
@@ -31,48 +31,65 @@ namespace VACExperiment
             assignment = participantManager.Assign(participantId);
             dataLogger.StartSession(participantId);
             CurrentConditionIndex = 0;
+            SetPhase(ExperimentPhase.InitialQuestionnairePause);
+        }
+
+        public void BeginTraining()
+        {
             SetPhase(ExperimentPhase.Training);
         }
 
-        public void FinishTrainingAndPauseForBaselineQuestionnaire()
-        {
-            SetPhase(ExperimentPhase.BaselineQuestionnairePause);
-        }
-
-        public void BeginFirstCondition()
+        public void FinishTrainingAndPrepareFirstCondition()
         {
             CurrentConditionIndex = 1;
-            BeginCurrentCondition();
+            SetPhase(ExperimentPhase.PreConditionQuestionnairePause);
         }
 
-        public void BeginSecondCondition()
+        public void PrepareSecondConditionAfterRecovery()
         {
             CurrentConditionIndex = 2;
-            BeginCurrentCondition();
+            SetPhase(ExperimentPhase.PreConditionQuestionnairePause);
+        }
+
+        public void BeginCurrentConditionAfterQuestionnaire()
+        {
+            if (CurrentConditionIndex < 1 || CurrentConditionIndex > 2)
+            {
+                Debug.LogError("No formal condition is prepared.");
+                return;
+            }
+
+            VacCondition condition = GetCurrentCondition();
+            vacController.ApplyCondition(condition);
+
+            dataLogger.LogEvent(
+                "ConditionStarted",
+                condition.ToString(),
+                $"ConditionIndex={CurrentConditionIndex};Sequence={GetCurrentSequence()}");
+
+            SetPhase(ExperimentPhase.Tetris);
         }
 
         public VacCondition GetCurrentCondition()
         {
-            return CurrentConditionIndex == 1
-                ? assignment.condition1
-                : assignment.condition2;
+            if (CurrentConditionIndex == 1)
+                return assignment.condition1;
+
+            if (CurrentConditionIndex == 2)
+                return assignment.condition2;
+
+            throw new System.InvalidOperationException("No formal condition is active.");
         }
 
         public TetrisSequenceId GetCurrentSequence()
         {
-            return CurrentConditionIndex == 1
-                ? assignment.sequence1
-                : assignment.sequence2;
-        }
+            if (CurrentConditionIndex == 1)
+                return assignment.sequence1;
 
-        public void MarkPreDepthStarted()
-        {
-            SetPhase(ExperimentPhase.PreDepth);
-        }
+            if (CurrentConditionIndex == 2)
+                return assignment.sequence2;
 
-        public void MarkTetrisStarted()
-        {
-            SetPhase(ExperimentPhase.Tetris);
+            throw new System.InvalidOperationException("No formal condition is active.");
         }
 
         public void MarkPostDepthStarted()
@@ -95,23 +112,15 @@ namespace VACExperiment
             SetPhase(ExperimentPhase.Complete);
         }
 
-        private void BeginCurrentCondition()
-        {
-            VacCondition condition = GetCurrentCondition();
-            vacController.ApplyCondition(condition);
-            dataLogger.LogEvent(
-                "ConditionStarted",
-                condition.ToString(),
-                $"ConditionIndex={CurrentConditionIndex};Sequence={GetCurrentSequence()}");
-            SetPhase(ExperimentPhase.PreDepth);
-        }
-
         private void SetPhase(ExperimentPhase newPhase)
         {
             Phase = newPhase;
-            string condition = CurrentConditionIndex > 0
-                ? GetCurrentCondition().ToString()
-                : "";
+
+            string condition = "";
+            if (CurrentConditionIndex == 1)
+                condition = assignment.condition1.ToString();
+            else if (CurrentConditionIndex == 2)
+                condition = assignment.condition2.ToString();
 
             dataLogger.LogEvent("PhaseChanged", condition, newPhase.ToString());
             Debug.Log($"Experiment phase: {newPhase}");
