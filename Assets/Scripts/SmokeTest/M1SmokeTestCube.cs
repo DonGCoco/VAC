@@ -80,6 +80,8 @@ namespace VACExperiment.SmokeTest
         [SerializeField] private float currentDistanceMeters;
         [SerializeField] private float currentWorldHeightMeters;
         [SerializeField] private float currentWorldWidthMeters;
+        [Tooltip("Angle between the panel normal and the line back to the captured viewer. For a correctly front-facing panel this should be approximately 0 degrees.")]
+        [SerializeField] private float facingErrorDegrees;
 
         private Vector3 capturedViewerPosition;
         private Vector3 capturedViewerForward;
@@ -147,13 +149,10 @@ namespace VACExperiment.SmokeTest
 
             capturedViewerPosition = activeViewer.position;
 
-            Vector3 flatForward =
-                Vector3.ProjectOnPlane(activeViewer.forward, Vector3.up).normalized;
-
-            if (flatForward.sqrMagnitude < 0.001f)
-                flatForward = activeViewer.forward.normalized;
-
-            capturedViewerForward = flatForward;
+            // Use the headset's FULL viewing direction, including pitch.
+            // The previous validation projected this vector onto the horizontal
+            // plane, which could leave the panel oblique to the actual gaze.
+            capturedViewerForward = activeViewer.forward.normalized;
             viewerPoseCaptured = true;
 
             Debug.Log(
@@ -230,6 +229,12 @@ namespace VACExperiment.SmokeTest
                     Vector3.one * currentWorldHeightMeters;
             }
 
+            Vector3 directionBackToViewer =
+                (capturedViewerPosition - transform.position).normalized;
+
+            facingErrorDegrees =
+                Vector3.Angle(transform.forward, directionBackToViewer);
+
             Debug.Log(
                 $"M2 constant-visual-angle test: " +
                 $"{(currentlyAtDistanceA ? "A" : "B")}, " +
@@ -237,6 +242,7 @@ namespace VACExperiment.SmokeTest
                 $"visualAngle={targetVerticalVisualAngleDegrees:F2} deg, " +
                 $"worldHeight={currentWorldHeightMeters:F3} m, " +
                 $"worldWidth={currentWorldWidthMeters:F3} m, " +
+                $"facingError={facingErrorDegrees:F2} deg, " +
                 $"worldFixed=true");
         }
     }
