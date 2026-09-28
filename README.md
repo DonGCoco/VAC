@@ -6,7 +6,7 @@ Group 5 experimental codebase for a within-subject study of vergence–accommoda
 
 **Active milestone: Milestone 1 — Device Smoke Test**
 
-The Magic Leap 2 is connected to Magic Leap Hub 3 over USB. The repository is now prepared to be opened with **Unity 6.3 LTS (6000.3.24f1)** and contains the minimum package manifest plus an Editor helper for creating the first on-device smoke-test scene.
+The Magic Leap 2 is connected to Magic Leap Hub 3 over USB. The repository is prepared for **Unity 6.2 (6000.2.15f1)**, which is the project baseline for Magic Leap 2 x86_64 support.
 
 Do not move on to virtual-depth manipulation until a simple Unity/OpenXR cube has successfully built, launched, and appeared on the real headset.
 
