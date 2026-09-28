@@ -128,15 +128,20 @@ namespace VACExperiment
         private static string Csv(string value)
         {
             value ??= "";
-            if (value.Contains(",") || value.Contains(""") || value.Contains("\n"))
+
+            if (value.Contains(",") || value.Contains(""") || value.Contains("\n") || value.Contains("\r"))
                 return """ + value.Replace(""", """") + """;
+
             return value;
         }
 
         private static string Sanitize(string value)
         {
+            value ??= "participant";
+
             foreach (char c in Path.GetInvalidFileNameChars())
                 value = value.Replace(c, '_');
+
             return value.Trim();
         }
     }
