@@ -25,7 +25,7 @@ From Milestone 2 onward, study parameters that belong to the actual experiment s
 
 Milestone 1 passes only when:
 
-1. Unity opens the repository with Unity 6.3 LTS (6000.3.24f1).
+1. Unity opens the repository with Unity 6.2 (6000.2.15f1).
 2. Magic Leap OpenXR settings validate without blocking errors.
 3. `M1_SmokeTest.unity` builds and installs to the connected Magic Leap 2.
 4. The app launches on-device.
@@ -37,26 +37,22 @@ Do not start Milestone 2 until all five are true.
 
 1. Let Unity finish resolving packages.
 2. Open **Window > Package Manager**.
-3. Select the Magic Leap SDK package and import the **ML Rig & Inputs** sample.
-4. Configure the project for Magic Leap 2 using the Magic Leap Project Setup Tool.
-5. For Unity 6, verify **Project Settings > Player > Other Settings > Application Entry Point**:
-   - Activity: enabled
-   - GameActivity: disabled
-6. Verify Android/OpenXR configuration:
+3. Select the Magic Leap SDK package and import the **ML Rig & OpenXR Input** sample.
+4. Configure the project for Magic Leap 2.
+5. Verify Android/OpenXR configuration:
    - Android target
    - OpenXR provider enabled for Android
-   - Magic Leap feature group enabled
-   - Magic Leap 2 Support enabled
+   - Magic Leap 2 feature group enabled
    - Magic Leap 2 Controller Interaction Profile enabled
    - Vulkan only
    - Minimum API Level 29
    - IL2CPP
    - x86-64
-7. Run **Window > XR > OpenXR > Project Validation** and fix blocking errors.
+6. Run **Window > XR > OpenXR > Project Validation** and fix blocking errors.
 
 ## Create the smoke-test scene
 
-After importing the ML Rig & Inputs sample:
+After importing the ML Rig & OpenXR Input sample:
 
 **VAC > Milestone 1 > Create Smoke Test Scene**
 
@@ -85,8 +81,7 @@ Keep the Magic Leap 2 connected by USB and visible in Magic Leap Hub 3.
 1. Switch the build target to Android if needed.
 2. Confirm `M1_SmokeTest.unity` is enabled.
 3. Choose **Build And Run**.
-4. If Unity warns that the Android SDK is outdated, choose **Use Highest Installed**.
-5. Put on the headset and confirm that the cube is visible.
+4. Put on the headset and confirm that the cube is visible.
 
 ## Stop condition
 
