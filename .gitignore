@@ -19,3 +19,8 @@
 *.mdb
 *.opendb
 *.VC.db
+
+.utmp/
+Assets/_Recovery/
+mono_crash.mem.*.blob
+Assets/_Recovery.meta
