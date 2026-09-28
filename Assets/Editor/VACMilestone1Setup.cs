@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using VACExperiment.SmokeTest;
 
 namespace VACExperiment.EditorTools
 {
@@ -59,8 +60,14 @@ namespace VACExperiment.EditorTools
 
             GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
             cube.name = "M1_SmokeTest_Cube";
+
+            M1SmokeTestCube controller = cube.AddComponent<M1SmokeTestCube>();
+            if (rigCamera != null)
+                controller.Configure(rigCamera.transform);
+
+            // These are only initial visible defaults.
+            // The tester changes them directly in the Inspector.
             cube.transform.position = new Vector3(0f, 0f, 1f);
-            cube.transform.rotation = Quaternion.Euler(0f, 65f, 0f);
             cube.transform.localScale = Vector3.one * 0.25f;
 
             GameObject lightObject = new GameObject("M1_DirectionalLight");
@@ -85,8 +92,8 @@ namespace VACExperiment.EditorTools
             EditorGUIUtility.PingObject(cube);
 
             Debug.Log(
-                "VAC Milestone 1 smoke-test scene created: " + ScenePath +
-                ". Build this scene to the connected Magic Leap 2.");
+                "VAC Milestone 1 smoke-test scene created. " +
+                "Select M1_SmokeTest_Cube to edit distance/size parameters in the Inspector.");
         }
     }
 }

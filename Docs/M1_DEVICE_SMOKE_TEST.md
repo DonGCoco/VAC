@@ -2,6 +2,25 @@
 
 Goal: prove the Unity/OpenXR/Magic Leap toolchain works on the real headset before adding experiment logic.
 
+## Working rule for this project
+
+During development, tunable experimental values must be visible rather than buried in code.
+
+For Milestone 1, select **M1_SmokeTest_Cube** in the Hierarchy. The Inspector exposes:
+
+- Viewer
+- Distance Meters
+- Vertical Offset Meters
+- Rotation Offset Degrees
+- Keep Apparent Angular Size
+- Reference Distance Meters
+- Reference Cube Size Meters
+- Place Once On Start
+
+The initial values are only test defaults. They are not final experimental values.
+
+From Milestone 2 onward, study parameters that belong to the actual experiment should live in the central **ExperimentConfig** asset so the team can change them without editing C#.
+
 ## Acceptance criteria
 
 Milestone 1 passes only when:
@@ -16,18 +35,10 @@ Do not start Milestone 2 until all five are true.
 
 ## One-time Unity setup
 
-The repository now contains:
-
-- `Packages/manifest.json` with Magic Leap SDK 2.6.0, OpenXR, XR Plug-in Management, XR Interaction Toolkit and Input System.
-- `ProjectSettings/ProjectVersion.txt` pinned to Unity 6000.3.24f1.
-- an Editor helper that creates the smoke-test scene without hand-writing Unity scene YAML.
-
-After opening the project:
-
 1. Let Unity finish resolving packages.
 2. Open **Window > Package Manager**.
 3. Select the Magic Leap SDK package and import the **ML Rig & Inputs** sample.
-4. Configure the project for Magic Leap 2. The official recommended route is the Magic Leap Project Setup Tool.
+4. Configure the project for Magic Leap 2 using the Magic Leap Project Setup Tool.
 5. For Unity 6, verify **Project Settings > Player > Other Settings > Application Entry Point**:
    - Activity: enabled
    - GameActivity: disabled
@@ -49,41 +60,36 @@ After importing the ML Rig & Inputs sample:
 
 **VAC > Milestone 1 > Create Smoke Test Scene**
 
-The helper will:
+The helper creates the scene, official ML Rig, smoke-test cube and directional light.
 
-- create a new scene,
-- instantiate the official Magic Leap ML Rig prefab,
-- set the rig camera near clip to 0.25 m,
-- create one cube at (0, 0, 1 m),
-- set the cube rotation to (0, 65, 0),
-- set cube scale to 0.25 m,
-- add a directional light,
-- save the scene as `Assets/Scenes/M1_SmokeTest.unity`,
-- put the scene first in the build list.
+Then select:
 
-This mirrors Magic Leap's simple OpenXR smoke-test structure while avoiding hand-authored scene YAML.
+**Hierarchy > M1_SmokeTest_Cube**
+
+and inspect the editable parameters before building.
+
+For the first run, leave:
+
+- Distance Meters = 1.0
+- Keep Apparent Angular Size = enabled
+- Reference Distance Meters = 1.0
+- Reference Cube Size Meters = 0.25
+- Place Once On Start = enabled
+
+The cube is placed once when the app starts and remains world-fixed.
 
 ## Build to the device
 
 Keep the Magic Leap 2 connected by USB and visible in Magic Leap Hub 3.
 
-In Unity:
-
 1. Switch the build target to Android if needed.
-2. Confirm only `M1_SmokeTest.unity` is enabled for the smoke test.
+2. Confirm `M1_SmokeTest.unity` is enabled.
 3. Choose **Build And Run**.
 4. If Unity warns that the Android SDK is outdated, choose **Use Highest Installed**.
 5. Put on the headset and confirm that the cube is visible.
 
 ## Stop condition
 
-If the cube does not appear, do not continue to Virtual Depth, controller input, Tetris or the experiment flow.
+If the cube does not appear, do not continue to Milestone 2.
 
-Capture:
-
-- Unity Console errors,
-- OpenXR Project Validation,
-- the Build/Build Profile window,
-- and the Magic Leap Hub device connection state.
-
-Fix Milestone 1 first.
+Capture the Unity Console, OpenXR Project Validation, Build window, and Hub connection state so the failure can be diagnosed.
