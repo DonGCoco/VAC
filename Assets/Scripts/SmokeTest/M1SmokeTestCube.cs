@@ -1,19 +1,22 @@
+using System.Collections;
 using UnityEngine;
 
 namespace VACExperiment.SmokeTest
 {
     /// <summary>
-    /// Milestone 1/2 real-device validation helper.
+    /// Milestone 2 real-device validation helper.
     ///
-    /// Milestone 1:
-    /// - prove that a world-fixed cube can be rendered on Magic Leap 2.
+    /// This test uses a flat panel rather than the authored cube shape when
+    /// "Use Flat Panel For Validation" is enabled. The panel's world size is
+    /// calculated from a requested visual angle:
     ///
-    /// Milestone 2:
-    /// - switch between two configurable virtual distances,
-    /// - keep the cube world-fixed relative to the viewer pose captured at startup,
-    /// - optionally compensate world-space scale so apparent angular size stays constant.
+    ///     size = 2 * distance * tan(angle / 2)
     ///
-    /// All test parameters are intentionally exposed in the Inspector.
+    /// This is the exact geometric relationship for a planar target centered
+    /// on the view direction. The target is placed once in a world-locked
+    /// reference frame and alternates between two configurable depths.
+    ///
+    /// All values that may be tuned during validation are exposed in Inspector.
     /// </summary>
     public class M1SmokeTestCube : MonoBehaviour
     {
@@ -22,52 +25,67 @@ namespace VACExperiment.SmokeTest
         [SerializeField] private Transform viewer;
 
         [Header("Milestone 2 — test distances")]
-        [Tooltip("First test distance in metres. This is a validation value, not a final VAC condition.")]
+        [Tooltip("First validation distance in metres. Not a final VAC condition.")]
         [Min(0.05f)]
         [SerializeField] private float distanceAMeters = 0.80f;
 
-        [Tooltip("Second test distance in metres. This is a validation value, not a final VAC condition.")]
+        [Tooltip("Second validation distance in metres. Not a final VAC condition.")]
         [Min(0.05f)]
         [SerializeField] private float distanceBMeters = 1.20f;
 
-        [Tooltip("Which test distance is used when the app starts.")]
+        [Tooltip("Which validation distance is used first.")]
         [SerializeField] private bool startAtDistanceA = true;
+
+        [Header("Constant visual angle")]
+        [Tooltip("Use a thin rectangular panel for the visual-angle check. Recommended for Milestone 2 because the final Tetris stimulus is flat.")]
+        [SerializeField] private bool useFlatPanelForValidation = true;
+
+        [Tooltip("Target vertical visual angle in degrees. The program computes world-space height from this value.")]
+        [Range(1f, 40f)]
+        [SerializeField] private float targetVerticalVisualAngleDegrees = 14f;
+
+        [Tooltip("Target width / height. 1 = square. Tetris can later use its actual board aspect ratio.")]
+        [Min(0.05f)]
+        [SerializeField] private float targetAspectRatio = 1f;
+
+        [Tooltip("Thickness of the validation panel in metres.")]
+        [Min(0.0005f)]
+        [SerializeField] private float panelThicknessMeters = 0.005f;
 
         [Header("Placement — editable in Inspector")]
         [Tooltip("Vertical offset from the captured eye position in metres.")]
-        [SerializeField] private float verticalOffsetMeters = 0.0f;
+        [SerializeField] private float verticalOffsetMeters = 0f;
 
-        [Tooltip("Additional cube rotation after it is placed facing the captured viewer direction.")]
-        [SerializeField] private Vector3 rotationOffsetDegrees = new Vector3(0f, 25f, 0f);
+        [Tooltip("Additional rotation after facing the captured viewer direction. Keep at zero for the visual-angle validation.")]
+        [SerializeField] private Vector3 rotationOffsetDegrees = Vector3.zero;
 
-        [Header("Apparent size — editable in Inspector")]
-        [Tooltip("If enabled, cube world size changes proportionally with distance so angular size stays constant.")]
-        [SerializeField] private bool keepApparentAngularSize = true;
+        [Header("XR pose capture")]
+        [Tooltip("Wait briefly for OpenXR head tracking to settle before capturing the initial viewer pose.")]
+        [Min(0f)]
+        [SerializeField] private float poseCaptureDelaySeconds = 0.75f;
 
-        [Tooltip("Distance at which Reference Cube Size is defined.")]
-        [Min(0.05f)]
-        [SerializeField] private float referenceDistanceMeters = 1.0f;
-
-        [Tooltip("Cube world size at the reference distance, in metres.")]
-        [Min(0.001f)]
-        [SerializeField] private float referenceCubeSizeMeters = 0.25f;
+        [Tooltip("Hide the target until the initial tracked viewer pose has been captured.")]
+        [SerializeField] private bool hideUntilPoseCaptured = true;
 
         [Header("Automatic device validation")]
-        [Tooltip("If enabled, the cube alternates between Distance A and B automatically. Useful before controller input is implemented.")]
+        [Tooltip("Automatically alternate between Distance A and B. This lets Milestone 2 be tested before controller input is implemented.")]
         [SerializeField] private bool autoSwitchDistances = true;
 
         [Tooltip("Seconds to remain at each distance before switching.")]
         [Min(0.25f)]
-        [SerializeField] private float autoSwitchIntervalSeconds = 3.0f;
+        [SerializeField] private float autoSwitchIntervalSeconds = 3f;
 
         [Header("Runtime state (read only in play mode)")]
         [SerializeField] private bool currentlyAtDistanceA = true;
         [SerializeField] private float currentDistanceMeters;
+        [SerializeField] private float currentWorldHeightMeters;
+        [SerializeField] private float currentWorldWidthMeters;
 
         private Vector3 capturedViewerPosition;
         private Vector3 capturedViewerForward;
         private bool viewerPoseCaptured;
         private float autoSwitchTimer;
+        private Renderer targetRenderer;
 
         public float CurrentDistanceMeters => currentDistanceMeters;
 
@@ -76,19 +94,30 @@ namespace VACExperiment.SmokeTest
             viewer = viewerTransform;
         }
 
-        private void Start()
+        private IEnumerator Start()
         {
+            targetRenderer = GetComponent<Renderer>();
+
+            if (hideUntilPoseCaptured && targetRenderer != null)
+                targetRenderer.enabled = false;
+
+            if (poseCaptureDelaySeconds > 0f)
+                yield return new WaitForSecondsRealtime(poseCaptureDelaySeconds);
+
             CaptureViewerPose();
 
             currentlyAtDistanceA = startAtDistanceA;
             ApplyCurrentDistance();
+
+            if (targetRenderer != null)
+                targetRenderer.enabled = true;
 
             autoSwitchTimer = 0f;
         }
 
         private void Update()
         {
-            if (!autoSwitchDistances)
+            if (!viewerPoseCaptured || !autoSwitchDistances)
                 return;
 
             autoSwitchTimer += Time.unscaledDeltaTime;
@@ -111,7 +140,7 @@ namespace VACExperiment.SmokeTest
             if (activeViewer == null)
             {
                 Debug.LogError(
-                    "M1SmokeTestCube: No viewer assigned and no Main Camera found.");
+                    "M2VisualAngleTest: No viewer assigned and no Main Camera found.");
                 viewerPoseCaptured = false;
                 return;
             }
@@ -164,9 +193,6 @@ namespace VACExperiment.SmokeTest
         private void ApplyDistance(float distanceMeters)
         {
             if (!viewerPoseCaptured)
-                CaptureViewerPose();
-
-            if (!viewerPoseCaptured)
                 return;
 
             currentDistanceMeters = Mathf.Max(0.05f, distanceMeters);
@@ -180,27 +206,37 @@ namespace VACExperiment.SmokeTest
                 Quaternion.LookRotation(-capturedViewerForward, Vector3.up)
                 * Quaternion.Euler(rotationOffsetDegrees);
 
-            float cubeSize = referenceCubeSizeMeters;
+            float halfAngleRadians =
+                0.5f * targetVerticalVisualAngleDegrees * Mathf.Deg2Rad;
 
-            if (keepApparentAngularSize)
+            currentWorldHeightMeters =
+                2f * currentDistanceMeters * Mathf.Tan(halfAngleRadians);
+
+            currentWorldWidthMeters =
+                currentWorldHeightMeters * targetAspectRatio;
+
+            if (useFlatPanelForValidation)
             {
-                if (referenceDistanceMeters <= 0f)
-                {
-                    Debug.LogError(
-                        "M1SmokeTestCube: Reference distance must be > 0.");
-                    return;
-                }
-
-                cubeSize *= currentDistanceMeters / referenceDistanceMeters;
+                transform.localScale = new Vector3(
+                    currentWorldWidthMeters,
+                    currentWorldHeightMeters,
+                    panelThicknessMeters);
+            }
+            else
+            {
+                // Uniform-scale fallback. The exact visual-angle validation
+                // should use the flat-panel mode above.
+                transform.localScale =
+                    Vector3.one * currentWorldHeightMeters;
             }
 
-            transform.localScale = Vector3.one * cubeSize;
-
             Debug.Log(
-                $"M2 virtual-depth test: " +
+                $"M2 constant-visual-angle test: " +
                 $"{(currentlyAtDistanceA ? "A" : "B")}, " +
                 $"distance={currentDistanceMeters:F3} m, " +
-                $"cubeSize={cubeSize:F3} m, " +
+                $"visualAngle={targetVerticalVisualAngleDegrees:F2} deg, " +
+                $"worldHeight={currentWorldHeightMeters:F3} m, " +
+                $"worldWidth={currentWorldWidthMeters:F3} m, " +
                 $"worldFixed=true");
         }
     }
