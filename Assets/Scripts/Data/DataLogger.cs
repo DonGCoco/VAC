@@ -129,10 +129,17 @@ namespace VACExperiment
         {
             value ??= "";
 
-            if (value.Contains(",") || value.Contains(""") || value.Contains("\n") || value.Contains("\r"))
-                return """ + value.Replace(""", """") + """;
+            string quote = ((char)34).ToString();
+            bool needsQuotes =
+                value.IndexOf(',') >= 0 ||
+                value.IndexOf((char)34) >= 0 ||
+                value.IndexOf('\n') >= 0 ||
+                value.IndexOf('\r') >= 0;
 
-            return value;
+            if (!needsQuotes)
+                return value;
+
+            return quote + value.Replace(quote, quote + quote) + quote;
         }
 
         private static string Sanitize(string value)
