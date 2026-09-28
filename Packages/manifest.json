@@ -1,0 +1,18 @@
+{
+  "scopedRegistries": [
+    {
+      "name": "Magic Leap",
+      "url": "https://registry.npmjs.org",
+      "scopes": [
+        "com.magicleap"
+      ]
+    }
+  ],
+  "dependencies": {
+    "com.magicleap.unitysdk": "2.6.0",
+    "com.unity.inputsystem": "1.17.0",
+    "com.unity.xr.interaction.toolkit": "3.0.9",
+    "com.unity.xr.management": "4.5.3",
+    "com.unity.xr.openxr": "1.16.1"
+  }
+}
