@@ -67,3 +67,36 @@ Milestone 1 passes on the actual Magic Leap 2 only when:
 5. The cube remains registered to the board while the participant moves their head.
 
 If the marker briefly leaves view after a valid registration, the last BoardAnchor pose is intentionally retained. No custom CV or smoothing is used.
+
+
+## Device validation — PASSED (2026-09-29)
+
+Validated on a physical Magic Leap 2.
+
+Validation setup:
+
+- QR payload: `VAC_BOARD_01`
+- QR displayed on an iPhone for the smoke test
+- Measured test marker size entered as `0.05 m`
+- Marker-to-board offset left at zero
+- Detector profile: `Accuracy`
+
+Observed result:
+
+- The QR was detected.
+- The test block appeared at the QR pose.
+- The test block remained registered to the QR while the wearer translated left/right and viewed it from an oblique angle.
+- The block did not follow head movement.
+- When the QR/object moved outside the Magic Leap display field of view, the virtual block was no longer visible; this was treated as a display-FOV effect rather than registration loss because registration remained stable when the QR stayed inside the display region.
+
+Milestone 1 therefore passes the physical-device registration criterion.
+
+### Android manifest note
+
+Unity 6.2 generated a custom manifest containing both `UnityPlayerActivity` and `UnityPlayerGameActivity`, which caused Gradle to fail because `BaseUnityGameActivityTheme` was unavailable for this Magic Leap build.
+
+The committed manifest intentionally keeps **Activity only** and includes:
+
+`com.magicleap.permission.MARKER_TRACKING`
+
+Do not re-add `UnityPlayerGameActivity` for this project unless the Magic Leap platform requirements change.
