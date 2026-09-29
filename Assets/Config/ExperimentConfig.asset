@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17457deda791a4b2eaa41e2c809a73ce, type: 3}
+  m_Name: ExperimentConfig
+  m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.ExperimentConfig
+  focalDistanceMeters: 0.74
+  c1DistanceMeters: 0.8
+  c2DistanceMeters: 1
+  c3DistanceMeters: 1.5
+  boardDistanceToleranceMeters: 0.03
+  tetrisDurationSeconds: 900
+  depthTaskReferenceDistanceMeters: 1
+  formalDepthTrials: 10
+  practiceDepthTrials: 3
+  depthDifferenceMeters: 0.03
+  targetHorizontalSeparationMeters: 0.12
+  targetReferenceScaleDistanceMeters: 1
+  lowVacDistance: 1
+  highVacDistance: 2

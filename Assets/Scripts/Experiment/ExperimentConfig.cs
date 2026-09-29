@@ -2,22 +2,38 @@ using UnityEngine;
 
 namespace VACExperiment
 {
+    public enum VacLevel
+    {
+        C1,
+        C2,
+        C3
+    }
+
     [CreateAssetMenu(fileName = "ExperimentConfig", menuName = "VAC Experiment/Experiment Config")]
     public class ExperimentConfig : ScriptableObject
     {
-        [Header("VAC stimulus distances (meters)")]
-        [Tooltip("Placeholder until pilot/supervisor confirmation.")]
-        [Min(0.01f)] public float lowVacDistance = 1.0f;
+        [Header("VAC conditions (meters)")]
+        [Tooltip("Optical focal distance of the Magic Leap 2 setup. Keep configurable until final confirmation.")]
+        [Min(0.05f)] public float focalDistanceMeters = 0.74f;
 
-        [Tooltip("Placeholder until pilot/supervisor confirmation.")]
-        [Min(0.01f)] public float highVacDistance = 2.0f;
+        [Tooltip("C1 target viewing distance. Current implementation default; keep configurable for pilot/supervisor updates.")]
+        [Min(0.05f)] public float c1DistanceMeters = 0.80f;
+
+        [Tooltip("C2 target viewing distance. Current implementation default; keep configurable for pilot/supervisor updates.")]
+        [Min(0.05f)] public float c2DistanceMeters = 1.00f;
+
+        [Tooltip("C3 target viewing distance. Current implementation default; keep configurable for pilot/supervisor updates.")]
+        [Min(0.05f)] public float c3DistanceMeters = 1.50f;
+
+        [Tooltip("Allowed absolute difference between target and measured board distance for Ready.")]
+        [Min(0.001f)] public float boardDistanceToleranceMeters = 0.03f;
 
         [Header("Tetris")]
         [Tooltip("Formal exposure duration. Final value should be fixed after pilot testing.")]
         [Min(1f)] public float tetrisDurationSeconds = 900f;
 
         [Header("Depth judgment")]
-        [Tooltip("Same reference depth is used after both VAC conditions.")]
+        [Tooltip("Current depth-task reference distance. Kept separate from the physical-board calibration.")]
         [Min(0.05f)] public float depthTaskReferenceDistanceMeters = 1.0f;
 
         [Tooltip("Pilot target is approximately 8–12 formal trials.")]
@@ -32,6 +48,23 @@ namespace VACExperiment
 
         [Tooltip("The target's authored scale is treated as correct at this distance.")]
         [Min(0.05f)] public float targetReferenceScaleDistanceMeters = 1.0f;
+
+        // Temporary compatibility fields for the old two-condition code.
+        // They stay hidden so Milestone 2 can move to C1/C2/C3 without breaking
+        // ExperimentManager/VACController before those systems are replaced later.
+        [HideInInspector] public float lowVacDistance = 1.0f;
+        [HideInInspector] public float highVacDistance = 2.0f;
+
+        public float GetTargetDistance(VacLevel level)
+        {
+            return level switch
+            {
+                VacLevel.C1 => c1DistanceMeters,
+                VacLevel.C2 => c2DistanceMeters,
+                VacLevel.C3 => c3DistanceMeters,
+                _ => c1DistanceMeters
+            };
+        }
 
         public float GetDistance(VacCondition condition)
         {

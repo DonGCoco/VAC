@@ -43,6 +43,7 @@ namespace VACExperiment.Board
 
         public bool IsMarkerVisible { get; private set; }
         public bool HasRegisteredBoard { get; private set; }
+        public Transform BoardAnchor => boardAnchor;
 
         private MagicLeapMarkerUnderstandingFeature markerFeature;
         private MarkerDetector markerDetector;
