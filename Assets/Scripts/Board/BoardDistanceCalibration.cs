@@ -135,18 +135,19 @@ namespace VACExperiment.Board
 
             GameObject statusObject = new("Status");
             statusObject.transform.SetParent(panel.transform, false);
-            statusObject.transform.localPosition = new Vector3(0f, 0.075f, 0f);
+            statusObject.transform.localPosition = new Vector3(0f, 0.09f, 0f);
 
             statusText = statusObject.AddComponent<TextMesh>();
             statusText.anchor = TextAnchor.MiddleCenter;
             statusText.alignment = TextAlignment.Center;
-            statusText.characterSize = 0.015f;
-            statusText.fontSize = 64;
+            statusText.characterSize = 0.006f;
+            statusText.fontSize = 48;
+            statusText.lineSpacing = 0.9f;
             statusText.text = "Waiting for marker";
 
-            CreateButton(panel.transform, "C1", new Vector3(-0.12f, 0f, 0f), SelectC1);
+            CreateButton(panel.transform, "C1", new Vector3(-0.085f, 0f, 0f), SelectC1);
             CreateButton(panel.transform, "C2", new Vector3(0f, 0f, 0f), SelectC2);
-            CreateButton(panel.transform, "C3", new Vector3(0.12f, 0f, 0f), SelectC3);
+            CreateButton(panel.transform, "C3", new Vector3(0.085f, 0f, 0f), SelectC3);
         }
 
         private static void CreateButton(
@@ -159,21 +160,25 @@ namespace VACExperiment.Board
             button.name = $"M2_{label}_Button";
             button.transform.SetParent(parent, false);
             button.transform.localPosition = localPosition;
-            button.transform.localScale = new Vector3(0.09f, 0.05f, 0.012f);
+            button.transform.localScale = new Vector3(0.06f, 0.03f, 0.008f);
+
+            MeshRenderer renderer = button.GetComponent<MeshRenderer>();
+            if (renderer != null)
+                renderer.enabled = false;
 
             XRSimpleInteractable interactable = button.AddComponent<XRSimpleInteractable>();
             interactable.selectEntered.AddListener(_ => callback());
 
             GameObject labelObject = new($"{label}_Label");
             labelObject.transform.SetParent(parent, false);
-            labelObject.transform.localPosition = localPosition + new Vector3(0f, 0f, -0.01f);
+            labelObject.transform.localPosition = localPosition;
 
             TextMesh labelText = labelObject.AddComponent<TextMesh>();
             labelText.anchor = TextAnchor.MiddleCenter;
             labelText.alignment = TextAlignment.Center;
-            labelText.characterSize = 0.02f;
-            labelText.fontSize = 64;
-            labelText.text = label;
+            labelText.characterSize = 0.008f;
+            labelText.fontSize = 48;
+            labelText.text = $"[ {label} ]";
         }
 
         private void RefreshStatusText()
