@@ -165,14 +165,13 @@ namespace VACExperiment.Board
             interactable.selectEntered.AddListener(_ => callback());
 
             GameObject labelObject = new($"{label}_Label");
-            labelObject.transform.SetParent(button.transform, false);
-            labelObject.transform.localPosition = new Vector3(0f, 0f, -0.55f);
-            labelObject.transform.localScale = new Vector3(8f, 8f, 8f);
+            labelObject.transform.SetParent(parent, false);
+            labelObject.transform.localPosition = localPosition + new Vector3(0f, 0f, -0.01f);
 
             TextMesh labelText = labelObject.AddComponent<TextMesh>();
             labelText.anchor = TextAnchor.MiddleCenter;
             labelText.alignment = TextAlignment.Center;
-            labelText.characterSize = 0.12f;
+            labelText.characterSize = 0.02f;
             labelText.fontSize = 64;
             labelText.text = label;
         }
