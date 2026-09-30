@@ -40,8 +40,14 @@ namespace VACExperiment.Board
         public float ActualDistanceMeters { get; private set; }
         public bool IsReady => CurrentState == BoardDistanceState.Ready;
 
-        private TextMesh statusText;
-        private TextMesh stateText;
+        private TextMesh conditionText;
+        private TextMesh actualValueText;
+        private GameObject actualWaitingObject;
+        private GameObject actualValueObject;
+        private GameObject waitingStateObject;
+        private GameObject tooCloseStateObject;
+        private GameObject readyStateObject;
+        private GameObject tooFarStateObject;
         private BoardDistanceState lastLoggedState = (BoardDistanceState)(-1);
         private VacLevel lastLoggedCondition = (VacLevel)(-1);
 
@@ -126,6 +132,13 @@ namespace VACExperiment.Board
 
         private void CreateRuntimePanel()
         {
+            Transform existingPanel = viewer.Find("M2_CalibrationPanel");
+            if (existingPanel != null)
+            {
+                existingPanel.gameObject.SetActive(false);
+                Destroy(existingPanel.gameObject);
+            }
+
             GameObject panel = new("M2_CalibrationPanel");
             panel.transform.SetParent(viewer, false);
             panel.transform.localPosition = new Vector3(
@@ -134,32 +147,89 @@ namespace VACExperiment.Board
                 panelDistanceMeters);
             panel.transform.localRotation = Quaternion.identity;
 
-            GameObject statusObject = new("StatusInfo");
-            statusObject.transform.SetParent(panel.transform, false);
-            statusObject.transform.localPosition = new Vector3(0f, 0.045f, 0f);
+            conditionText = CreateText(
+                panel.transform,
+                "ConditionTarget",
+                new Vector3(0f, 0.060f, 0f),
+                0.0026f,
+                40,
+                "C1   Target 0.80 m");
 
-            statusText = statusObject.AddComponent<TextMesh>();
-            statusText.anchor = TextAnchor.MiddleCenter;
-            statusText.alignment = TextAlignment.Center;
-            statusText.characterSize = 0.0026f;
-            statusText.fontSize = 40;
-            statusText.lineSpacing = 1.15f;
-            statusText.text = "Waiting for marker";
+            actualWaitingObject = CreateText(
+                panel.transform,
+                "ActualWaiting",
+                new Vector3(0f, 0.030f, 0f),
+                0.0026f,
+                40,
+                "Actual --").gameObject;
 
-            GameObject stateObject = new("DistanceState");
-            stateObject.transform.SetParent(panel.transform, false);
-            stateObject.transform.localPosition = new Vector3(0f, 0.125f, 0f);
+            actualValueText = CreateText(
+                panel.transform,
+                "ActualValue",
+                new Vector3(0f, 0.030f, 0f),
+                0.0026f,
+                40,
+                "Actual 0.000 m");
+            actualValueObject = actualValueText.gameObject;
 
-            stateText = stateObject.AddComponent<TextMesh>();
-            stateText.anchor = TextAnchor.MiddleCenter;
-            stateText.alignment = TextAlignment.Center;
-            stateText.characterSize = 0.0032f;
-            stateText.fontSize = 42;
-            stateText.text = "SHOW QR MARKER";
+            waitingStateObject = CreateText(
+                panel.transform,
+                "StateWaiting",
+                new Vector3(0f, 0.120f, 0f),
+                0.0032f,
+                42,
+                "SHOW QR MARKER").gameObject;
+
+            tooCloseStateObject = CreateText(
+                panel.transform,
+                "StateTooClose",
+                new Vector3(0f, 0.120f, 0f),
+                0.0032f,
+                42,
+                "TOO CLOSE").gameObject;
+
+            readyStateObject = CreateText(
+                panel.transform,
+                "StateReady",
+                new Vector3(0f, 0.120f, 0f),
+                0.0032f,
+                42,
+                "READY").gameObject;
+
+            tooFarStateObject = CreateText(
+                panel.transform,
+                "StateTooFar",
+                new Vector3(0f, 0.120f, 0f),
+                0.0032f,
+                42,
+                "TOO FAR").gameObject;
 
             CreateButton(panel.transform, "C1", new Vector3(-0.10f, -0.025f, 0f), SelectC1);
             CreateButton(panel.transform, "C2", new Vector3(0f, -0.025f, 0f), SelectC2);
             CreateButton(panel.transform, "C3", new Vector3(0.10f, -0.025f, 0f), SelectC3);
+
+            RefreshStatusText();
+        }
+
+        private static TextMesh CreateText(
+            Transform parent,
+            string objectName,
+            Vector3 localPosition,
+            float characterSize,
+            int fontSize,
+            string initialText)
+        {
+            GameObject textObject = new(objectName);
+            textObject.transform.SetParent(parent, false);
+            textObject.transform.localPosition = localPosition;
+
+            TextMesh textMesh = textObject.AddComponent<TextMesh>();
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.characterSize = characterSize;
+            textMesh.fontSize = fontSize;
+            textMesh.text = initialText;
+            return textMesh;
         }
 
         private static void CreateButton(
@@ -195,27 +265,30 @@ namespace VACExperiment.Board
 
         private void RefreshStatusText()
         {
-            if (statusText == null || stateText == null)
+            if (conditionText == null ||
+                actualWaitingObject == null ||
+                actualValueText == null ||
+                actualValueObject == null ||
+                waitingStateObject == null ||
+                tooCloseStateObject == null ||
+                readyStateObject == null ||
+                tooFarStateObject == null)
                 return;
 
-            string stateLabel = CurrentState switch
-            {
-                BoardDistanceState.WaitingForMarker => "SHOW QR MARKER",
-                BoardDistanceState.TooClose => "TOO CLOSE",
-                BoardDistanceState.Ready => "READY",
-                BoardDistanceState.TooFar => "TOO FAR",
-                _ => "UNKNOWN"
-            };
+            conditionText.text =
+                $"{CurrentCondition}   Target {TargetDistanceMeters:F2} m";
 
-            string actualText = CurrentState == BoardDistanceState.WaitingForMarker
-                ? "--"
-                : $"{ActualDistanceMeters:F3} m";
+            bool waiting = CurrentState == BoardDistanceState.WaitingForMarker;
+            actualWaitingObject.SetActive(waiting);
+            actualValueObject.SetActive(!waiting);
 
-            statusText.text =
-                $"{CurrentCondition}   Target {TargetDistanceMeters:F2} m\n" +
-                $"Actual {actualText}";
+            if (!waiting)
+                actualValueText.text = $"Actual {ActualDistanceMeters:F3} m";
 
-            stateText.text = stateLabel;
+            waitingStateObject.SetActive(CurrentState == BoardDistanceState.WaitingForMarker);
+            tooCloseStateObject.SetActive(CurrentState == BoardDistanceState.TooClose);
+            readyStateObject.SetActive(CurrentState == BoardDistanceState.Ready);
+            tooFarStateObject.SetActive(CurrentState == BoardDistanceState.TooFar);
         }
 
         private void LogConditionSelection()
