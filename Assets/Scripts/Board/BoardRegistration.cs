@@ -44,10 +44,19 @@ namespace VACExperiment.Board
         public bool IsMarkerVisible { get; private set; }
         public bool HasRegisteredBoard { get; private set; }
         public Transform BoardAnchor => boardAnchor;
+        public float SecondsSinceMarkerSeen =>
+            HasRegisteredBoard ? Time.unscaledTime - lastMarkerSeenTime : float.PositiveInfinity;
+
+        public bool HasRecentMarkerObservation(float graceSeconds)
+        {
+            return HasRegisteredBoard &&
+                   Time.unscaledTime - lastMarkerSeenTime <= Mathf.Max(0f, graceSeconds);
+        }
 
         private MagicLeapMarkerUnderstandingFeature markerFeature;
         private MarkerDetector markerDetector;
         private bool loggedFirstRegistration;
+        private float lastMarkerSeenTime = float.NegativeInfinity;
 
         public void Configure(XROrigin origin, Transform anchor)
         {
@@ -138,6 +147,7 @@ namespace VACExperiment.Board
                 ApplyMarkerPose(data.MarkerPose.Value);
                 IsMarkerVisible = true;
                 HasRegisteredBoard = true;
+                lastMarkerSeenTime = Time.unscaledTime;
 
                 if (!loggedFirstRegistration)
                 {

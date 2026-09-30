@@ -28,6 +28,9 @@ namespace VACExperiment
         [Tooltip("Allowed absolute difference between target and measured board distance for Ready.")]
         [Min(0.001f)] public float boardDistanceToleranceMeters = 0.03f;
 
+        [Tooltip("How long a recent QR observation remains valid between Marker Understanding updates.")]
+        [Min(0f)] public float markerVisibilityGraceSeconds = 0.50f;
+
         [Header("Tetris")]
         [Tooltip("Formal exposure duration. Final value should be fixed after pilot testing.")]
         [Min(1f)] public float tetrisDurationSeconds = 900f;

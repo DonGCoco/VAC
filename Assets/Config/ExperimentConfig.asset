@@ -17,6 +17,7 @@ MonoBehaviour:
   c2DistanceMeters: 1
   c3DistanceMeters: 1.5
   boardDistanceToleranceMeters: 0.03
+  markerVisibilityGraceSeconds: 0.5
   tetrisDurationSeconds: 900
   depthTaskReferenceDistanceMeters: 1
   formalDepthTrials: 10

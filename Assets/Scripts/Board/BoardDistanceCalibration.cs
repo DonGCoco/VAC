@@ -111,7 +111,7 @@ namespace VACExperiment.Board
 
         private void RefreshMeasurement()
         {
-            if (!boardRegistration.IsMarkerVisible)
+            if (!boardRegistration.HasRecentMarkerObservation(config.markerVisibilityGraceSeconds))
             {
                 CurrentState = BoardDistanceState.WaitingForMarker;
                 ActualDistanceMeters = 0f;
