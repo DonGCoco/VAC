@@ -41,6 +41,7 @@ namespace VACExperiment.Board
         public bool IsReady => CurrentState == BoardDistanceState.Ready;
 
         private TextMesh statusText;
+        private TextMesh stateText;
         private BoardDistanceState lastLoggedState = (BoardDistanceState)(-1);
         private VacLevel lastLoggedCondition = (VacLevel)(-1);
 
@@ -133,17 +134,28 @@ namespace VACExperiment.Board
                 panelDistanceMeters);
             panel.transform.localRotation = Quaternion.identity;
 
-            GameObject statusObject = new("Status");
+            GameObject statusObject = new("StatusInfo");
             statusObject.transform.SetParent(panel.transform, false);
-            statusObject.transform.localPosition = new Vector3(0f, 0.09f, 0f);
+            statusObject.transform.localPosition = new Vector3(0f, 0.055f, 0f);
 
             statusText = statusObject.AddComponent<TextMesh>();
             statusText.anchor = TextAnchor.MiddleCenter;
             statusText.alignment = TextAlignment.Center;
-            statusText.characterSize = 0.006f;
-            statusText.fontSize = 48;
-            statusText.lineSpacing = 0.9f;
+            statusText.characterSize = 0.005f;
+            statusText.fontSize = 44;
+            statusText.lineSpacing = 1.0f;
             statusText.text = "Waiting for marker";
+
+            GameObject stateObject = new("DistanceState");
+            stateObject.transform.SetParent(panel.transform, false);
+            stateObject.transform.localPosition = new Vector3(0f, 0.135f, 0f);
+
+            stateText = stateObject.AddComponent<TextMesh>();
+            stateText.anchor = TextAnchor.MiddleCenter;
+            stateText.alignment = TextAlignment.Center;
+            stateText.characterSize = 0.006f;
+            stateText.fontSize = 48;
+            stateText.text = "SHOW QR MARKER";
 
             CreateButton(panel.transform, "C1", new Vector3(-0.085f, 0f, 0f), SelectC1);
             CreateButton(panel.transform, "C2", new Vector3(0f, 0f, 0f), SelectC2);
@@ -183,10 +195,10 @@ namespace VACExperiment.Board
 
         private void RefreshStatusText()
         {
-            if (statusText == null)
+            if (statusText == null || stateText == null)
                 return;
 
-            string stateText = CurrentState switch
+            string stateLabel = CurrentState switch
             {
                 BoardDistanceState.WaitingForMarker => "SHOW QR MARKER",
                 BoardDistanceState.TooClose => "TOO CLOSE",
@@ -201,8 +213,9 @@ namespace VACExperiment.Board
 
             statusText.text =
                 $"{CurrentCondition}   Target {TargetDistanceMeters:F2} m\n" +
-                $"Actual {actualText}\n" +
-                $"{stateText}";
+                $"Actual {actualText}";
+
+            stateText.text = stateLabel;
         }
 
         private void LogConditionSelection()
