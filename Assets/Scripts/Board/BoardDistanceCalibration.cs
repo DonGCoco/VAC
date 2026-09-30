@@ -136,30 +136,30 @@ namespace VACExperiment.Board
 
             GameObject statusObject = new("StatusInfo");
             statusObject.transform.SetParent(panel.transform, false);
-            statusObject.transform.localPosition = new Vector3(0f, 0.055f, 0f);
+            statusObject.transform.localPosition = new Vector3(0f, 0.045f, 0f);
 
             statusText = statusObject.AddComponent<TextMesh>();
             statusText.anchor = TextAnchor.MiddleCenter;
             statusText.alignment = TextAlignment.Center;
-            statusText.characterSize = 0.005f;
-            statusText.fontSize = 44;
-            statusText.lineSpacing = 1.0f;
+            statusText.characterSize = 0.0026f;
+            statusText.fontSize = 40;
+            statusText.lineSpacing = 1.15f;
             statusText.text = "Waiting for marker";
 
             GameObject stateObject = new("DistanceState");
             stateObject.transform.SetParent(panel.transform, false);
-            stateObject.transform.localPosition = new Vector3(0f, 0.135f, 0f);
+            stateObject.transform.localPosition = new Vector3(0f, 0.125f, 0f);
 
             stateText = stateObject.AddComponent<TextMesh>();
             stateText.anchor = TextAnchor.MiddleCenter;
             stateText.alignment = TextAlignment.Center;
-            stateText.characterSize = 0.006f;
-            stateText.fontSize = 48;
+            stateText.characterSize = 0.0032f;
+            stateText.fontSize = 42;
             stateText.text = "SHOW QR MARKER";
 
-            CreateButton(panel.transform, "C1", new Vector3(-0.085f, 0f, 0f), SelectC1);
-            CreateButton(panel.transform, "C2", new Vector3(0f, 0f, 0f), SelectC2);
-            CreateButton(panel.transform, "C3", new Vector3(0.085f, 0f, 0f), SelectC3);
+            CreateButton(panel.transform, "C1", new Vector3(-0.10f, -0.025f, 0f), SelectC1);
+            CreateButton(panel.transform, "C2", new Vector3(0f, -0.025f, 0f), SelectC2);
+            CreateButton(panel.transform, "C3", new Vector3(0.10f, -0.025f, 0f), SelectC3);
         }
 
         private static void CreateButton(
@@ -172,7 +172,7 @@ namespace VACExperiment.Board
             button.name = $"M2_{label}_Button";
             button.transform.SetParent(parent, false);
             button.transform.localPosition = localPosition;
-            button.transform.localScale = new Vector3(0.06f, 0.03f, 0.008f);
+            button.transform.localScale = new Vector3(0.055f, 0.026f, 0.008f);
 
             MeshRenderer renderer = button.GetComponent<MeshRenderer>();
             if (renderer != null)
@@ -188,9 +188,9 @@ namespace VACExperiment.Board
             TextMesh labelText = labelObject.AddComponent<TextMesh>();
             labelText.anchor = TextAnchor.MiddleCenter;
             labelText.alignment = TextAlignment.Center;
-            labelText.characterSize = 0.008f;
-            labelText.fontSize = 48;
-            labelText.text = $"[ {label} ]";
+            labelText.characterSize = 0.0032f;
+            labelText.fontSize = 42;
+            labelText.text = label;
         }
 
         private void RefreshStatusText()
