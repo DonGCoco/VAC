@@ -73,3 +73,12 @@ The full participant/condition sequence selection is deferred to the later exper
 - Tetris remains co-planar with the registered board.
 - C1/C2/C3 continue to change the full Tetris visual size without changing its depth plane.
 - Menu ends the test and restores the experimenter panel.
+
+
+## Revised experimenter handoff
+
+The in-headset calibration controls are no longer the default experiment flow.
+
+The participant wears the headset while the experimenter watches a separate laptop monitor with the live target/actual distance and Ready state. The experimenter gives verbal closer/farther instructions, clicks LOCK when Ready, and only then does START appear inside the headset for the participant.
+
+See `Docs/EXPERIMENTER_REALTIME_FLOW.md`.
