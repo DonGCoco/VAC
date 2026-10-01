@@ -2,6 +2,8 @@ using System;
 using MagicLeap.OpenXR.Features.MarkerUnderstanding;
 using Unity.XR.CoreUtils;
 using UnityEngine;
+using UnityEngine.XR.ARFoundation;
+using UnityEngine.XR.ARSubsystems;
 using UnityEngine.XR.OpenXR;
 
 namespace VACExperiment.Board
@@ -48,6 +50,10 @@ namespace VACExperiment.Board
         public bool HasRegisteredBoard { get; private set; }
         public bool IsPoseLocked { get; private set; }
         public Transform BoardAnchor => boardAnchor;
+        public bool IsSpatialAnchorTracking =>
+            spatialAnchor != null &&
+            !spatialAnchor.pending &&
+            spatialAnchor.trackingState == TrackingState.Tracking;
         public float SecondsSinceMarkerSeen =>
             HasRegisteredBoard ? Time.unscaledTime - lastMarkerSeenTime : float.PositiveInfinity;
 
@@ -61,6 +67,8 @@ namespace VACExperiment.Board
         private MarkerDetector markerDetector;
         private bool loggedFirstRegistration;
         private float lastMarkerSeenTime = float.NegativeInfinity;
+        private ARAnchorManager anchorManager;
+        private ARAnchor spatialAnchor;
 
         public void Configure(XROrigin origin, Transform anchor)
         {
@@ -101,6 +109,10 @@ namespace VACExperiment.Board
                 enabled = false;
                 return;
             }
+
+            anchorManager = xrOrigin.GetComponent<ARAnchorManager>();
+            if (anchorManager == null)
+                anchorManager = xrOrigin.gameObject.AddComponent<ARAnchorManager>();
 
             if (hideBoardUntilFirstDetection)
                 boardAnchor.gameObject.SetActive(false);
@@ -205,21 +217,47 @@ namespace VACExperiment.Board
             if (!HasRegisteredBoard)
                 return false;
 
+            if (spatialAnchor != null)
+                Destroy(spatialAnchor);
+
+            // Magic Leap's OpenXR Spatial Anchor Subsystem is the official
+            // world-locking mechanism. Add the anchor at the already validated
+            // BoardAnchor pose rather than trying to freeze a plain Transform.
+            spatialAnchor = boardAnchor.GetComponent<ARAnchor>();
+            if (spatialAnchor == null)
+                spatialAnchor = boardAnchor.gameObject.AddComponent<ARAnchor>();
+
             IsPoseLocked = true;
+
             Debug.Log(
-                $"M2 board pose locked at position={boardAnchor.position}, " +
-                $"rotation={boardAnchor.rotation.eulerAngles}.");
+                $"M2 board pose lock requested at position={boardAnchor.position}, " +
+                $"rotation={boardAnchor.rotation.eulerAngles}; " +
+                $"spatialAnchorPending={spatialAnchor.pending}.");
             return true;
         }
 
         public void UnlockBoardPose()
         {
             IsPoseLocked = false;
-            Debug.Log("M2 board pose unlocked; QR tracking can update BoardAnchor again.");
+
+            if (spatialAnchor != null)
+            {
+                Destroy(spatialAnchor);
+                spatialAnchor = null;
+            }
+
+            Debug.Log(
+                "M2 board pose unlocked; spatial anchor removed and QR tracking can update BoardAnchor again.");
         }
 
         private void OnDestroy()
         {
+            if (spatialAnchor != null)
+            {
+                Destroy(spatialAnchor);
+                spatialAnchor = null;
+            }
+
             if (markerFeature != null && markerDetector != null)
                 markerFeature.DestroyMarkerDetector(markerDetector);
         }

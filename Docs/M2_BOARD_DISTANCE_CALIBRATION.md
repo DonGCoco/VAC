@@ -121,3 +121,27 @@ For C1/C2/C3:
 - if the registered board plane is at 1.50 m, the Tetris plane remains on that plane.
 
 The Tetris root must therefore be parented to `BoardAnchor` and use no implicit local-Z depth offset. Any future marker-to-board displacement remains an explicit, configurable measured transform rather than a hard-coded depth shift.
+
+
+## Spatial-anchor lock
+
+A plain Unity Transform lock was not sufficient during device testing: the virtual board still shifted relative to the real QR during head translation.
+
+M2 now uses Magic Leap's official OpenXR Spatial Anchor Subsystem through AR Foundation when `LOCK` is selected.
+
+Requirements:
+
+- Magic Leap Spatial Anchor OpenXR feature enabled.
+- `com.magicleap.permission.SPATIAL_ANCHOR` in the Android manifest.
+- `ARAnchorManager` on the XR Origin; the component is added automatically if missing.
+
+Flow:
+
+1. QR tracking establishes BoardAnchor pose.
+2. Distance reaches READY.
+3. LOCK adds an `ARAnchor` to BoardAnchor.
+4. UI shows `ANCHORING...` until the anchor reports Tracking.
+5. UI shows `LOCKED` once the spatial anchor is actively tracked.
+6. RESCAN removes the spatial anchor and resumes QR pose updates.
+
+The spatial anchor stabilizes the already validated board pose; it does not change the board/Tetris depth or add a hidden Z offset.

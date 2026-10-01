@@ -9,6 +9,7 @@ namespace VACExperiment.Board
         TooClose,
         Ready,
         TooFar,
+        Locking,
         Locked
     }
 
@@ -51,6 +52,7 @@ namespace VACExperiment.Board
         private GameObject tooCloseStateObject;
         private GameObject readyStateObject;
         private GameObject tooFarStateObject;
+        private GameObject lockingStateObject;
         private GameObject lockedStateObject;
         private BoardDistanceState lastLoggedState = (BoardDistanceState)(-1);
         private VacLevel lastLoggedCondition = (VacLevel)(-1);
@@ -154,10 +156,11 @@ namespace VACExperiment.Board
         {
             if (boardRegistration.IsPoseLocked)
             {
-                // Lock freezes the physical board pose, not the participant's head position.
-                // Keep measuring the live viewing distance to the frozen BoardAnchor.
+                // Keep live head-to-board distance even after the board is anchored.
                 ActualDistanceMeters = Vector3.Distance(viewer.position, boardAnchor.position);
-                CurrentState = BoardDistanceState.Locked;
+                CurrentState = boardRegistration.IsSpatialAnchorTracking
+                    ? BoardDistanceState.Locked
+                    : BoardDistanceState.Locking;
                 return;
             }
 
@@ -254,6 +257,14 @@ namespace VACExperiment.Board
                 42,
                 "TOO FAR").gameObject;
 
+            lockingStateObject = CreateText(
+                panel.transform,
+                "StateLocking",
+                new Vector3(0f, 0.120f, 0f),
+                0.0032f,
+                42,
+                "ANCHORING...").gameObject;
+
             lockedStateObject = CreateText(
                 panel.transform,
                 "StateLocked",
@@ -333,6 +344,7 @@ namespace VACExperiment.Board
                 tooCloseStateObject == null ||
                 readyStateObject == null ||
                 tooFarStateObject == null ||
+                lockingStateObject == null ||
                 lockedStateObject == null)
                 return;
 
@@ -350,6 +362,7 @@ namespace VACExperiment.Board
             tooCloseStateObject.SetActive(CurrentState == BoardDistanceState.TooClose);
             readyStateObject.SetActive(CurrentState == BoardDistanceState.Ready);
             tooFarStateObject.SetActive(CurrentState == BoardDistanceState.TooFar);
+            lockingStateObject.SetActive(CurrentState == BoardDistanceState.Locking);
             lockedStateObject.SetActive(CurrentState == BoardDistanceState.Locked);
         }
 
