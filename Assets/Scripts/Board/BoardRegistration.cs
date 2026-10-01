@@ -28,7 +28,7 @@ namespace VACExperiment.Board
         [SerializeField] private float markerSizeMeters = 0.12f;
 
         [Tooltip("Development aid for temporary/screen-displayed QR markers. When enabled, Magic Leap estimates QR size instead of trusting Marker Size Meters. Disable for the formal board once the printed QR size is known exactly.")]
-        [SerializeField] private bool estimateQrLength = true;
+        [SerializeField] private bool estimateQrLength = false;
 
         [Tooltip("Accuracy is appropriate for board registration; change only if device testing requires it.")]
         [SerializeField] private MarkerDetectorProfile detectorProfile = MarkerDetectorProfile.Accuracy;

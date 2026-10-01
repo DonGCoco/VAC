@@ -120,3 +120,10 @@ This uses Magic Leap Marker Understanding's built-in QR size estimation instead 
 For the formal experiment, disable automatic estimation and enter the accurately measured printed QR side length (excluding the outer white margin). Magic Leap notes that a known correct marker size can provide higher localization accuracy.
 
 Do not compensate for a wrong marker pose by adding an arbitrary marker-to-board Z offset. The virtual stimulus should remain co-planar with the physical board reference.
+
+
+### Recommended default for M2 validation
+
+Keep `Estimate QR Length = false` for normal M2 validation and enter the measured physical QR side length manually. This gives the detector an immediate known-size constraint and avoids waiting for head-motion triangulation before a valid pose is available.
+
+Use `Estimate QR Length = true` only as a diagnostic option when the marker size is unknown; it may require deliberate left/right head movement before the QR pose becomes available.

@@ -167,7 +167,7 @@ MonoBehaviour:
   boardAnchor: {fileID: 1700000011}
   targetQrText: VAC_BOARD_01
   markerSizeMeters: 0.12
-  estimateQrLength: 1
+  estimateQrLength: 0
   detectorProfile: 2
   markerToBoardPositionMeters: {x: 0, y: 0, z: 0}
   markerToBoardEulerDegrees: {x: 0, y: 0, z: 0}
