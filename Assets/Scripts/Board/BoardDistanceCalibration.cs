@@ -27,6 +27,7 @@ namespace VACExperiment.Board
         [SerializeField] private Transform boardAnchor;
         [SerializeField] private Transform viewer;
         [SerializeField] private ExperimentConfig config;
+        [SerializeField] private ConditionController conditionController;
 
         [Header("Calibration")]
         [SerializeField] private VacLevel initialCondition = VacLevel.C1;
@@ -88,6 +89,11 @@ namespace VACExperiment.Board
             CurrentCondition = initialCondition;
             RefreshTargetDistance();
 
+            if (conditionController == null)
+                conditionController = FindAnyObjectByType<ConditionController>();
+
+            conditionController?.ApplyCondition(CurrentCondition);
+
             if (createRuntimePanel)
                 CreateRuntimePanel();
 
@@ -113,6 +119,7 @@ namespace VACExperiment.Board
             CurrentCondition = level;
             LockedDistanceMeters = 0f;
             RefreshTargetDistance();
+            conditionController?.ApplyCondition(CurrentCondition);
             LogConditionSelection();
         }
 

@@ -31,6 +31,10 @@ namespace VACExperiment
         [Tooltip("How long a recent QR observation remains valid between Marker Understanding updates.")]
         [Min(0f)] public float markerVisibilityGraceSeconds = 0.50f;
 
+        [Header("Condition visual geometry")]
+        [Tooltip("Distance at which the authored stimulus local scale is treated as the reference visual size.")]
+        [Min(0.05f)] public float visualAngleReferenceDistanceMeters = 1.0f;
+
         [Header("Tetris")]
         [Tooltip("Formal exposure duration. Final value should be fixed after pilot testing.")]
         [Min(1f)] public float tetrisDurationSeconds = 900f;

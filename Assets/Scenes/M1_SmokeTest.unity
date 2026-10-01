@@ -325,6 +325,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1800000002}
   - component: {fileID: 1800000003}
+  - component: {fileID: 1800000004}
   m_Layer: 0
   m_Name: M2_BoardDistanceCalibration
   m_TagString: Untagged
@@ -363,10 +364,28 @@ MonoBehaviour:
   boardAnchor: {fileID: 1700000011}
   viewer: {fileID: 0}
   config: {fileID: 11400000, guid: f17c9c148bae4df1bf2e6b717885b6cc, type: 2}
+  conditionController: {fileID: 1800000004}
   initialCondition: 0
   createRuntimePanel: 1
   panelDistanceMeters: 0.7
   panelVerticalOffsetMeters: -0.18
+--- !u!114 &1800000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1800000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2f28ad3c2db4f30988a43d87379a6d1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.ConditionController
+  config: {fileID: 11400000, guid: f17c9c148bae4df1bf2e6b717885b6cc, type: 2}
+  boardRegistration: {fileID: 1700000003}
+  stimulusRoot: {fileID: 1700000021}
+  stimulusOffsetMeters: {x: 0, y: 0}
+  stimulusInPlaneRotationDegrees: 0
 --- !u!1 &832524826
 GameObject:
   m_ObjectHideFlags: 0
