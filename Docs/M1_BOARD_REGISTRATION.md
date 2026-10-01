@@ -100,3 +100,12 @@ The committed manifest intentionally keeps **Activity only** and includes:
 `com.magicleap.permission.MARKER_TRACKING`
 
 Do not re-add `UnityPlayerGameActivity` for this project unless the Magic Leap platform requirements change.
+
+
+## VAC co-planarity requirement
+
+For this experiment, the virtual stimulus plane must match the physical board plane in depth.
+
+The M1 test object is therefore centred at `BoardAnchor local Z = 0`. No hidden forward/backward test offset is allowed.
+
+During development with no final physical board, the QR plane may temporarily stand in for the board plane. Once the real board exists, only the configurable marker-to-board transform is updated. The later Tetris root must remain co-planar with `BoardAnchor` by default.

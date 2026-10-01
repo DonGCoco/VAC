@@ -108,3 +108,16 @@ During development, the QR itself may temporarily act as the board reference:
 When the real board is available later, only the marker size and marker-to-board offset/rotation need to be measured and configured. The registration and distance-calibration logic does not change.
 
 After `LOCK`, the BoardAnchor pose is frozen, but the displayed `Actual` viewing distance remains live because the headset/participant can still move relative to the locked board.
+
+
+## Critical VAC geometry rule
+
+The target distance is not only a calibration number. The virtual Tetris plane must physically coincide in depth with the registered board plane.
+
+For C1/C2/C3:
+
+- if the registered board plane is at 0.80 m, the Tetris plane is also at that registered plane;
+- if the registered board plane is at 1.00 m, the Tetris plane remains on that plane;
+- if the registered board plane is at 1.50 m, the Tetris plane remains on that plane.
+
+The Tetris root must therefore be parented to `BoardAnchor` and use no implicit local-Z depth offset. Any future marker-to-board displacement remains an explicit, configurable measured transform rather than a hard-coded depth shift.

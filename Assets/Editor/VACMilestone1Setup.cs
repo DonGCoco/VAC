@@ -70,8 +70,10 @@ namespace VACExperiment.EditorTools
             GameObject testCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
             testCube.name = "M1_BoardTestCube";
             testCube.transform.SetParent(boardAnchor.transform, false);
-            testCube.transform.localPosition = new Vector3(0f, 0f, -0.015f);
-            testCube.transform.localScale = new Vector3(0.06f, 0.06f, 0.01f);
+            // VAC experiments require virtual content to be co-planar with the
+            // physical board/marker plane. Do not add a hidden depth offset here.
+            testCube.transform.localPosition = Vector3.zero;
+            testCube.transform.localScale = new Vector3(0.06f, 0.06f, 0.002f);
 
             registration.Configure(xrOrigin, boardAnchor.transform);
 
