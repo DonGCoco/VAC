@@ -3,6 +3,11 @@ using UnityEngine.Events;
 
 namespace VACExperiment.Tetris
 {
+    /// <summary>
+    /// Static/self-paced Tetris for the VAC experiment.
+    /// Pieces never fall automatically. The participant positions/rotates the
+    /// current piece, then explicitly hard-drops it to place it.
+    /// </summary>
     public class TetrisManager : MonoBehaviour
     {
         [SerializeField] private ExperimentConfig config;
@@ -10,22 +15,26 @@ namespace VACExperiment.Tetris
         [SerializeField] private TetrisSequenceManager sequenceManager;
         [SerializeField] private DataLogger dataLogger;
 
-        [Header("Drop timing")]
-        [SerializeField, Min(0.05f)] private float normalDropInterval = 0.8f;
-        [SerializeField, Min(0.02f)] private float softDropInterval = 0.08f;
+        [Header("Input")]
+        [Tooltip("Briefly ignores gameplay input after START so the trigger used on the experimenter UI cannot place a piece.")]
+        [SerializeField, Min(0f)] private float startInputGuardSeconds = 0.35f;
 
         [Header("Events")]
         public UnityEvent onSessionCompleted;
 
         public bool IsRunning { get; private set; }
         public float RemainingSeconds { get; private set; }
+        public int Score => score;
+        public int LinesCleared => linesCleared;
+        public int PiecesPlaced => piecesPlaced;
+        public TetrisSequenceId CurrentSequence => sequenceId;
 
-        private VacCondition condition;
+        private VacCondition legacyCondition;
+        private VacLevel vacLevel;
+        private bool useLegacyConditionLogging;
         private TetrisSequenceId sequenceId;
         private TetrisPiece activePiece;
         private int sequenceIndex;
-        private float nextDropTime;
-        private bool softDropHeld;
 
         private int score;
         private int linesCleared;
@@ -34,8 +43,25 @@ namespace VACExperiment.Tetris
         private float placementTimeTotal;
         private float currentPieceSpawnTime;
         private float sessionStartTime;
+        private float inputEnabledTime;
 
+        // Compatibility entry point for the old two-condition flow.
         public void BeginSession(VacCondition newCondition, TetrisSequenceId newSequence)
+        {
+            legacyCondition = newCondition;
+            useLegacyConditionLogging = true;
+            BeginSessionInternal(newSequence);
+        }
+
+        // New C1/C2/C3 experiment entry point.
+        public void BeginSession(VacLevel newCondition, TetrisSequenceId newSequence)
+        {
+            vacLevel = newCondition;
+            useLegacyConditionLogging = false;
+            BeginSessionInternal(newSequence);
+        }
+
+        private void BeginSessionInternal(TetrisSequenceId newSequence)
         {
             if (config == null || board == null || sequenceManager == null)
             {
@@ -43,7 +69,6 @@ namespace VACExperiment.Tetris
                 return;
             }
 
-            condition = newCondition;
             sequenceId = newSequence;
             sequenceIndex = 0;
             score = 0;
@@ -55,9 +80,14 @@ namespace VACExperiment.Tetris
             board.ClearBoard();
             RemainingSeconds = config.tetrisDurationSeconds;
             sessionStartTime = Time.realtimeSinceStartup;
+            inputEnabledTime = Time.unscaledTime + startInputGuardSeconds;
             IsRunning = true;
 
             SpawnNextPiece();
+
+            Debug.Log(
+                $"M4 static Tetris started: sequence={sequenceId}; " +
+                $"mode=self-paced/no-gravity.");
         }
 
         private void Update()
@@ -70,47 +100,43 @@ namespace VACExperiment.Tetris
                 config.tetrisDurationSeconds - (Time.realtimeSinceStartup - sessionStartTime));
 
             if (RemainingSeconds <= 0f)
-            {
                 EndSession();
-                return;
-            }
-
-            float interval = softDropHeld ? softDropInterval : normalDropInterval;
-
-            if (Time.time >= nextDropTime && activePiece != null)
-            {
-                activePiece.StepDown();
-                nextDropTime = Time.time + interval;
-            }
         }
 
         public void MoveLeft()
         {
-            if (IsRunning && activePiece != null)
+            if (CanAcceptInput())
                 activePiece.MoveLeft();
         }
 
         public void MoveRight()
         {
-            if (IsRunning && activePiece != null)
+            if (CanAcceptInput())
                 activePiece.MoveRight();
         }
 
         public void RotateClockwise()
         {
-            if (IsRunning && activePiece != null)
+            if (CanAcceptInput())
                 activePiece.RotateClockwise();
         }
 
         public void HardDrop()
         {
-            if (IsRunning && activePiece != null)
+            if (CanAcceptInput())
                 activePiece.HardDrop();
         }
 
+        // Kept only so the old keyboard debug component still compiles.
+        // Static Tetris intentionally has no soft/automatic drop.
         public void SetSoftDrop(bool held)
         {
-            softDropHeld = held;
+        }
+
+        public void EndSessionEarly()
+        {
+            if (IsRunning)
+                EndSession();
         }
 
         public void LockCurrentPiece()
@@ -119,7 +145,8 @@ namespace VACExperiment.Tetris
                 return;
 
             Vector2Int[] absolute = activePiece.GetAbsoluteCells();
-            bool toppedOut = board.HasCellsAboveBoard(activePiece.Position,
+            bool toppedOut = board.HasCellsAboveBoard(
+                activePiece.Position,
                 GetRelativeCells(activePiece, absolute));
 
             int clearedThisPiece = board.LockPiece(activePiece);
@@ -141,6 +168,13 @@ namespace VACExperiment.Tetris
             SpawnNextPiece();
         }
 
+        private bool CanAcceptInput()
+        {
+            return IsRunning &&
+                   activePiece != null &&
+                   Time.unscaledTime >= inputEnabledTime;
+        }
+
         private void SpawnNextPiece()
         {
             Tetromino type = sequenceManager.GetPiece(sequenceId, sequenceIndex++);
@@ -150,7 +184,6 @@ namespace VACExperiment.Tetris
             activePiece = pieceObject.AddComponent<TetrisPiece>();
             activePiece.Initialize(board, this, type, board.SpawnPosition);
 
-            // If the spawn position is already invalid, count a top-out and reset.
             if (!board.IsValid(activePiece.Position, TetrominoLibrary.GetCells(type)))
             {
                 topOuts++;
@@ -162,7 +195,6 @@ namespace VACExperiment.Tetris
             }
 
             currentPieceSpawnTime = Time.realtimeSinceStartup;
-            nextDropTime = Time.time + normalDropInterval;
         }
 
         private void EndSession()
@@ -180,15 +212,25 @@ namespace VACExperiment.Tetris
                 ? placementTimeTotal / piecesPlaced
                 : 0f;
 
-            dataLogger?.LogTetrisSummary(
-                condition,
-                sequenceId,
-                duration,
-                score,
-                linesCleared,
-                piecesPlaced,
-                averagePlacementTime,
-                topOuts);
+            // Formal C1/C2/C3 logging is deliberately deferred to the logging milestone.
+            // Keep compatibility with the old two-condition path for now.
+            if (useLegacyConditionLogging)
+            {
+                dataLogger?.LogTetrisSummary(
+                    legacyCondition,
+                    sequenceId,
+                    duration,
+                    score,
+                    linesCleared,
+                    piecesPlaced,
+                    averagePlacementTime,
+                    topOuts);
+            }
+
+            Debug.Log(
+                $"M4 static Tetris ended: condition={vacLevel}; sequence={sequenceId}; " +
+                $"duration={duration:F1}s; score={score}; lines={linesCleared}; " +
+                $"pieces={piecesPlaced}; topOuts={topOuts}.");
 
             onSessionCompleted?.Invoke();
         }
@@ -212,6 +254,7 @@ namespace VACExperiment.Tetris
             Vector2Int[] relative = new Vector2Int[absoluteCells.Length];
             for (int i = 0; i < absoluteCells.Length; i++)
                 relative[i] = absoluteCells[i] - piece.Position;
+
             return relative;
         }
     }

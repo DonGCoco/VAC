@@ -12,8 +12,10 @@ namespace VACExperiment
 
     public enum TetrisSequenceId
     {
+        T,
         A,
-        B
+        B,
+        C
     }
 
     [Serializable]

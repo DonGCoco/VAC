@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using VACExperiment.Tetris;
 
 namespace VACExperiment.Board
 {
@@ -28,6 +29,7 @@ namespace VACExperiment.Board
         [SerializeField] private Transform viewer;
         [SerializeField] private ExperimentConfig config;
         [SerializeField] private ConditionController conditionController;
+        [SerializeField] private TetrisManager tetrisManager;
 
         [Header("Calibration")]
         [SerializeField] private VacLevel initialCondition = VacLevel.C1;
@@ -57,6 +59,7 @@ namespace VACExperiment.Board
         private GameObject lockingStateObject;
         private GameObject lockedStateObject;
         private GameObject anchorErrorStateObject;
+        private GameObject runtimePanel;
         private BoardDistanceState lastLoggedState = (BoardDistanceState)(-1);
         private VacLevel lastLoggedCondition = (VacLevel)(-1);
 
@@ -92,7 +95,13 @@ namespace VACExperiment.Board
             if (conditionController == null)
                 conditionController = FindAnyObjectByType<ConditionController>();
 
+            if (tetrisManager == null)
+                tetrisManager = FindAnyObjectByType<TetrisManager>();
+
             conditionController?.ApplyCondition(CurrentCondition);
+
+            if (tetrisManager != null)
+                tetrisManager.onSessionCompleted.AddListener(ShowExperimenterPanel);
 
             if (createRuntimePanel)
                 CreateRuntimePanel();
@@ -105,6 +114,12 @@ namespace VACExperiment.Board
             RefreshMeasurement();
             RefreshStatusText();
             LogStateTransition();
+        }
+
+        private void OnDestroy()
+        {
+            if (tetrisManager != null)
+                tetrisManager.onSessionCompleted.RemoveListener(ShowExperimenterPanel);
         }
 
         public void SelectC1() => SelectCondition(VacLevel.C1);
@@ -151,9 +166,43 @@ namespace VACExperiment.Board
 
         public void RescanBoard()
         {
+            if (tetrisManager != null && tetrisManager.IsRunning)
+                tetrisManager.EndSessionEarly();
+
             boardRegistration.UnlockBoardPose();
             LockedDistanceMeters = 0f;
             CurrentState = BoardDistanceState.WaitingForMarker;
+        }
+
+        public void StartTetrisTest()
+        {
+            if (tetrisManager == null)
+            {
+                Debug.LogError("M4 START requires a TetrisManager.");
+                return;
+            }
+
+            if (CurrentState != BoardDistanceState.Locked ||
+                !boardRegistration.IsSpatialAnchorTracking)
+            {
+                Debug.LogWarning(
+                    "M4 Tetris can only start after the board reports LOCKED.");
+                return;
+            }
+
+            tetrisManager.BeginSession(CurrentCondition, TetrisSequenceId.A);
+            SetExperimenterPanelVisible(false);
+        }
+
+        private void ShowExperimenterPanel()
+        {
+            SetExperimenterPanelVisible(true);
+        }
+
+        private void SetExperimenterPanelVisible(bool visible)
+        {
+            if (runtimePanel != null)
+                runtimePanel.SetActive(visible);
         }
 
         private void RefreshTargetDistance()
@@ -207,6 +256,7 @@ namespace VACExperiment.Board
             }
 
             GameObject panel = new("M2_CalibrationPanel");
+            runtimePanel = panel;
             panel.transform.SetParent(viewer, false);
             panel.transform.localPosition = new Vector3(
                 0f,
@@ -300,6 +350,7 @@ namespace VACExperiment.Board
             CreateButton(panel.transform, "C3", new Vector3(0.10f, -0.025f, 0f), SelectC3);
             CreateButton(panel.transform, "LOCK", new Vector3(-0.055f, -0.070f, 0f), LockBoardPose);
             CreateButton(panel.transform, "RESCAN", new Vector3(0.055f, -0.070f, 0f), RescanBoard);
+            CreateButton(panel.transform, "START", new Vector3(0f, -0.115f, 0f), StartTetrisTest);
 
             RefreshStatusText();
         }

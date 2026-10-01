@@ -213,11 +213,12 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1700000021}
-  - component: {fileID: 1700000022}
-  - component: {fileID: 1700000023}
-  - component: {fileID: 1700000024}
+  - component: {fileID: 1700000025}
+  - component: {fileID: 1700000026}
+  - component: {fileID: 1700000027}
+  - component: {fileID: 1700000028}
   m_Layer: 0
-  m_Name: M1_BoardTestCube
+  m_Name: M4_TetrisRoot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -233,88 +234,81 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.06, y: 0.06, z: 0.002}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1700000011}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &1700000022
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1700000020}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!65 &1700000023
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1700000020}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!23 &1700000024
-MeshRenderer:
+--- !u!114 &1700000025
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1700000020}
   m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 1
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 1
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_AdditionalVertexStreams: {fileID: 0}
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fb581b96044f43ce981e0494804faff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.Tetris.TetrisBoard
+  width: 10
+  height: 20
+  cellSize: 0.02
+  blockThicknessMeters: 0.002
+  blockPrefab: {fileID: 0}
+  showBoardFrame: 1
+  frameBarWidthMeters: 0.002
+--- !u!114 &1700000026
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1700000020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 977c5b0468d2f4a9781b5a762d96f9ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.Tetris.TetrisSequenceManager
+  trainingSeed: 65537
+  sequenceASeed: 104729
+  sequenceBSeed: 130363
+  sequenceCSeed: 155921
+  generatedSequenceLength: 256
+--- !u!114 &1700000027
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1700000020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ce464f3a096d4cb89a5e5a758f3d5a9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.Tetris.TetrisManager
+  config: {fileID: 11400000, guid: f17c9c148bae4df1bf2e6b717885b6cc, type: 2}
+  board: {fileID: 1700000025}
+  sequenceManager: {fileID: 1700000026}
+  dataLogger: {fileID: 0}
+  startInputGuardSeconds: 0.35
+  onSessionCompleted:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &1700000028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1700000020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d1b445ab47b45b18e4d8c4b90dc3a11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.Tetris.MagicLeapTetrisInput
+  tetrisManager: {fileID: 1700000027}
+  horizontalThreshold: 0.35
 --- !u!1 &1800000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -365,6 +359,7 @@ MonoBehaviour:
   viewer: {fileID: 0}
   config: {fileID: 11400000, guid: f17c9c148bae4df1bf2e6b717885b6cc, type: 2}
   conditionController: {fileID: 1800000004}
+  tetrisManager: {fileID: 1700000027}
   initialCondition: 0
   createRuntimePanel: 1
   panelDistanceMeters: 0.7
