@@ -92,3 +92,19 @@ For each condition:
 6. Before moving the board for the next condition, select `RESCAN` or select the next C1/C2/C3 condition. This unlocks `BoardAnchor` and resumes marker-based registration.
 
 This matches the intended setup sequence: move board -> detect -> validate distance -> establish/update board anchor -> lock block -> run.
+
+
+## Proxy testing before the final board exists
+
+Milestone 2 does not require the final physical board geometry.
+
+During development, the QR itself may temporarily act as the board reference:
+
+- keep `Marker To Board Position Meters = (0,0,0)`,
+- keep `Marker To Board Euler Degrees = (0,0,0)`,
+- use any rigid/stationary surface or sufficiently large screen to hold/display the QR,
+- enter the QR's measured physical side length.
+
+When the real board is available later, only the marker size and marker-to-board offset/rotation need to be measured and configured. The registration and distance-calibration logic does not change.
+
+After `LOCK`, the BoardAnchor pose is frozen, but the displayed `Actual` viewing distance remains live because the headset/participant can still move relative to the locked board.

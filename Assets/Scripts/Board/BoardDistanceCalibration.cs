@@ -154,7 +154,9 @@ namespace VACExperiment.Board
         {
             if (boardRegistration.IsPoseLocked)
             {
-                ActualDistanceMeters = LockedDistanceMeters;
+                // Lock freezes the physical board pose, not the participant's head position.
+                // Keep measuring the live viewing distance to the frozen BoardAnchor.
+                ActualDistanceMeters = Vector3.Distance(viewer.position, boardAnchor.position);
                 CurrentState = BoardDistanceState.Locked;
                 return;
             }
@@ -342,10 +344,7 @@ namespace VACExperiment.Board
             actualValueObject.SetActive(!waiting);
 
             if (!waiting)
-            {
-                string prefix = CurrentState == BoardDistanceState.Locked ? "Locked" : "Actual";
-                actualValueText.text = $"{prefix} {ActualDistanceMeters:F3} m";
-            }
+                actualValueText.text = $"Actual {ActualDistanceMeters:F3} m";
 
             waitingStateObject.SetActive(CurrentState == BoardDistanceState.WaitingForMarker);
             tooCloseStateObject.SetActive(CurrentState == BoardDistanceState.TooClose);
