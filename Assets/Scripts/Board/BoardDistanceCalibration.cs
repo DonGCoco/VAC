@@ -8,7 +8,8 @@ namespace VACExperiment.Board
         WaitingForMarker,
         TooClose,
         Ready,
-        TooFar
+        TooFar,
+        Locked
     }
 
     /// <summary>
@@ -39,6 +40,8 @@ namespace VACExperiment.Board
         public float TargetDistanceMeters { get; private set; }
         public float ActualDistanceMeters { get; private set; }
         public bool IsReady => CurrentState == BoardDistanceState.Ready;
+        public bool IsBoardLocked => boardRegistration != null && boardRegistration.IsPoseLocked;
+        public float LockedDistanceMeters { get; private set; }
 
         private TextMesh conditionText;
         private TextMesh actualValueText;
@@ -48,6 +51,7 @@ namespace VACExperiment.Board
         private GameObject tooCloseStateObject;
         private GameObject readyStateObject;
         private GameObject tooFarStateObject;
+        private GameObject lockedStateObject;
         private BoardDistanceState lastLoggedState = (BoardDistanceState)(-1);
         private VacLevel lastLoggedCondition = (VacLevel)(-1);
 
@@ -99,9 +103,46 @@ namespace VACExperiment.Board
 
         public void SelectCondition(VacLevel level)
         {
+            if (boardRegistration != null && boardRegistration.IsPoseLocked)
+                boardRegistration.UnlockBoardPose();
+
             CurrentCondition = level;
+            LockedDistanceMeters = 0f;
             RefreshTargetDistance();
             LogConditionSelection();
+        }
+
+        public void LockBoardPose()
+        {
+            if (CurrentState != BoardDistanceState.Ready)
+            {
+                Debug.LogWarning(
+                    "M2 board pose can only be locked while the selected condition is READY.");
+                return;
+            }
+
+            if (!boardRegistration.HasRecentMarkerObservation(config.markerVisibilityGraceSeconds))
+            {
+                Debug.LogWarning(
+                    "M2 board pose lock rejected because the QR marker is not currently reliable.");
+                return;
+            }
+
+            if (!boardRegistration.LockCurrentBoardPose())
+                return;
+
+            LockedDistanceMeters = ActualDistanceMeters;
+            CurrentState = BoardDistanceState.Locked;
+            Debug.Log(
+                $"M2 board distance locked: condition={CurrentCondition}; " +
+                $"actual={LockedDistanceMeters:F3} m.");
+        }
+
+        public void RescanBoard()
+        {
+            boardRegistration.UnlockBoardPose();
+            LockedDistanceMeters = 0f;
+            CurrentState = BoardDistanceState.WaitingForMarker;
         }
 
         private void RefreshTargetDistance()
@@ -111,6 +152,13 @@ namespace VACExperiment.Board
 
         private void RefreshMeasurement()
         {
+            if (boardRegistration.IsPoseLocked)
+            {
+                ActualDistanceMeters = LockedDistanceMeters;
+                CurrentState = BoardDistanceState.Locked;
+                return;
+            }
+
             if (!boardRegistration.HasRecentMarkerObservation(config.markerVisibilityGraceSeconds))
             {
                 CurrentState = BoardDistanceState.WaitingForMarker;
@@ -204,9 +252,19 @@ namespace VACExperiment.Board
                 42,
                 "TOO FAR").gameObject;
 
+            lockedStateObject = CreateText(
+                panel.transform,
+                "StateLocked",
+                new Vector3(0f, 0.120f, 0f),
+                0.0032f,
+                42,
+                "LOCKED").gameObject;
+
             CreateButton(panel.transform, "C1", new Vector3(-0.10f, -0.025f, 0f), SelectC1);
             CreateButton(panel.transform, "C2", new Vector3(0f, -0.025f, 0f), SelectC2);
             CreateButton(panel.transform, "C3", new Vector3(0.10f, -0.025f, 0f), SelectC3);
+            CreateButton(panel.transform, "LOCK", new Vector3(-0.055f, -0.070f, 0f), LockBoardPose);
+            CreateButton(panel.transform, "RESCAN", new Vector3(0.055f, -0.070f, 0f), RescanBoard);
 
             RefreshStatusText();
         }
@@ -272,7 +330,8 @@ namespace VACExperiment.Board
                 waitingStateObject == null ||
                 tooCloseStateObject == null ||
                 readyStateObject == null ||
-                tooFarStateObject == null)
+                tooFarStateObject == null ||
+                lockedStateObject == null)
                 return;
 
             conditionText.text =
@@ -283,12 +342,16 @@ namespace VACExperiment.Board
             actualValueObject.SetActive(!waiting);
 
             if (!waiting)
-                actualValueText.text = $"Actual {ActualDistanceMeters:F3} m";
+            {
+                string prefix = CurrentState == BoardDistanceState.Locked ? "Locked" : "Actual";
+                actualValueText.text = $"{prefix} {ActualDistanceMeters:F3} m";
+            }
 
             waitingStateObject.SetActive(CurrentState == BoardDistanceState.WaitingForMarker);
             tooCloseStateObject.SetActive(CurrentState == BoardDistanceState.TooClose);
             readyStateObject.SetActive(CurrentState == BoardDistanceState.Ready);
             tooFarStateObject.SetActive(CurrentState == BoardDistanceState.TooFar);
+            lockedStateObject.SetActive(CurrentState == BoardDistanceState.Locked);
         }
 
         private void LogConditionSelection()

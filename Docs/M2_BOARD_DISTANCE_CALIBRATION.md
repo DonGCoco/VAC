@@ -64,3 +64,31 @@ Formal experiment CSV logging remains a later milestone.
    - within tolerance -> `READY`
    - farther than target plus tolerance -> `TOO FAR`
 7. Hide the QR or move it outside marker tracking and confirm `SHOW QR MARKER`.
+
+
+## Formal physical-board setup
+
+The phone-displayed 5 cm QR is only a near-range smoke test. It is not the formal marker for the 1.5 m condition.
+
+For the physical experiment board:
+
+- Print one high-contrast QR with payload `VAC_BOARD_01`.
+- Attach it rigidly and flat to the same physical board that defines the Tetris plane.
+- Use a known measured QR side length. For a maximum viewing distance of 1.5 m, use at least 0.15 m; a slightly larger marker is preferable if the board has room.
+- Enter the measured black/white QR square side length, excluding the outer white margin, into `Marker Size Meters`.
+- Place the QR outside the active Tetris area if possible, then measure the QR-centre-to-board-reference offset and enter it in `Marker To Board Position Meters` / `Marker To Board Euler Degrees`.
+
+The QR therefore defines the physical board transform; no separate plane-detection system is required for this milestone.
+
+## Lock / rescan flow
+
+For each condition:
+
+1. Move the physical board to the target distance.
+2. Keep the QR visible while the operator aligns the board until the M2 panel reports `READY`.
+3. Select `LOCK`.
+4. `BoardAnchor` is frozen at the validated pose and no longer follows noisy subsequent QR pose updates.
+5. Run the condition.
+6. Before moving the board for the next condition, select `RESCAN` or select the next C1/C2/C3 condition. This unlocks `BoardAnchor` and resumes marker-based registration.
+
+This matches the intended setup sequence: move board -> detect -> validate distance -> establish/update board anchor -> lock block -> run.

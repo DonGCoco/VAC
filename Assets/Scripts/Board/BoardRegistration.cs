@@ -43,6 +43,7 @@ namespace VACExperiment.Board
 
         public bool IsMarkerVisible { get; private set; }
         public bool HasRegisteredBoard { get; private set; }
+        public bool IsPoseLocked { get; private set; }
         public Transform BoardAnchor => boardAnchor;
         public float SecondsSinceMarkerSeen =>
             HasRegisteredBoard ? Time.unscaledTime - lastMarkerSeenTime : float.PositiveInfinity;
@@ -144,7 +145,9 @@ namespace VACExperiment.Board
                 if (!data.MarkerPose.HasValue)
                     continue;
 
-                ApplyMarkerPose(data.MarkerPose.Value);
+                if (!IsPoseLocked)
+                    ApplyMarkerPose(data.MarkerPose.Value);
+
                 IsMarkerVisible = true;
                 HasRegisteredBoard = true;
                 lastMarkerSeenTime = Time.unscaledTime;
@@ -187,6 +190,24 @@ namespace VACExperiment.Board
 
             if (!boardAnchor.gameObject.activeSelf)
                 boardAnchor.gameObject.SetActive(true);
+        }
+
+        public bool LockCurrentBoardPose()
+        {
+            if (!HasRegisteredBoard)
+                return false;
+
+            IsPoseLocked = true;
+            Debug.Log(
+                $"M2 board pose locked at position={boardAnchor.position}, " +
+                $"rotation={boardAnchor.rotation.eulerAngles}.");
+            return true;
+        }
+
+        public void UnlockBoardPose()
+        {
+            IsPoseLocked = false;
+            Debug.Log("M2 board pose unlocked; QR tracking can update BoardAnchor again.");
         }
 
         private void OnDestroy()
