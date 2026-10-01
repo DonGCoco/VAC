@@ -23,9 +23,12 @@ namespace VACExperiment.Board
         [Tooltip("Exact text encoded in the QR marker attached to the physical board.")]
         [SerializeField] private string targetQrText = "VAC_BOARD_01";
 
-        [Tooltip("Measured physical side length of the QR marker in metres.")]
+        [Tooltip("Measured physical side length of the QR marker in metres, excluding the outer white margin. Used when automatic size estimation is disabled.")]
         [Min(0.01f)]
         [SerializeField] private float markerSizeMeters = 0.12f;
+
+        [Tooltip("Development aid for temporary/screen-displayed QR markers. When enabled, Magic Leap estimates QR size instead of trusting Marker Size Meters. Disable for the formal board once the printed QR size is known exactly.")]
+        [SerializeField] private bool estimateQrLength = true;
 
         [Tooltip("Accuracy is appropriate for board registration; change only if device testing requires it.")]
         [SerializeField] private MarkerDetectorProfile detectorProfile = MarkerDetectorProfile.Accuracy;
@@ -105,8 +108,9 @@ namespace VACExperiment.Board
             MarkerDetectorSettings settings = new();
             settings.MarkerDetectorProfile = detectorProfile;
             settings.MarkerType = MarkerType.QR;
-            settings.QRSettings.EstimateQRLength = false;
-            settings.QRSettings.QRLength = markerSizeMeters;
+            settings.QRSettings.EstimateQRLength = estimateQrLength;
+            if (!estimateQrLength)
+                settings.QRSettings.QRLength = markerSizeMeters;
 
             markerDetector = markerFeature.CreateMarkerDetector(settings);
             if (markerDetector == null)
@@ -118,9 +122,13 @@ namespace VACExperiment.Board
                 return;
             }
 
+            string sizeMode = estimateQrLength
+                ? "automatic QR size estimation"
+                : $"fixed QR size {markerSizeMeters:F3} m";
+
             Debug.Log(
                 $"M1 board registration ready. Waiting for QR '{targetQrText}' " +
-                $"({markerSizeMeters:F3} m).");
+                $"using {sizeMode}.");
         }
 
         private void Update()

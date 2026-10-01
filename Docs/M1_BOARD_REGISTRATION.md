@@ -109,3 +109,14 @@ For this experiment, the virtual stimulus plane must match the physical board pl
 The M1 test object is therefore centred at `BoardAnchor local Z = 0`. No hidden forward/backward test offset is allowed.
 
 During development with no final physical board, the QR plane may temporarily stand in for the board plane. Once the real board exists, only the configurable marker-to-board transform is updated. The later Tetris root must remain co-planar with `BoardAnchor` by default.
+
+
+## Temporary marker-size estimation for proxy testing
+
+If the final physical board/printed QR does not exist yet, a screen-displayed QR can be tested with `Estimate QR Length = true`.
+
+This uses Magic Leap Marker Understanding's built-in QR size estimation instead of trusting the configured `Marker Size Meters`. It is useful for diagnosing apparent depth offsets caused by an inaccurate assumed QR size.
+
+For the formal experiment, disable automatic estimation and enter the accurately measured printed QR side length (excluding the outer white margin). Magic Leap notes that a known correct marker size can provide higher localization accuracy.
+
+Do not compensate for a wrong marker pose by adding an arbitrary marker-to-board Z offset. The virtual stimulus should remain co-planar with the physical board reference.
