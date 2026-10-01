@@ -77,3 +77,15 @@ On device:
 6. Confirm head motion does not trigger continuous rescaling.
 
 Absolute physical board-distance accuracy remains the separate pending M2 hardware validation and must be completed with the final board and an independent physical measurement before pilot data collection.
+
+
+## Device validation status
+
+Validated on Magic Leap 2:
+
+- C1/C2/C3 visibly change the proxy stimulus size as expected.
+- The stimulus remains on the same registered board plane while switching conditions.
+- The stimulus position does not move in depth when the condition changes.
+- No continuous head-motion-driven rescaling was observed.
+
+Milestone 3 is therefore accepted. Absolute physical board-distance accuracy remains the separate pending M2 hardware validation before pilot data collection.
