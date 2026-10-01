@@ -145,3 +145,19 @@ Flow:
 6. RESCAN removes the spatial anchor and resumes QR pose updates.
 
 The spatial anchor stabilizes the already validated board pose; it does not change the board/Tetris depth or add a hidden Z offset.
+
+
+### Anchor subsystem readiness
+
+Device testing showed that a LOCK request could appear to do nothing when the OpenXR anchor subsystem had not finished loading.
+
+The lock path now follows the Magic Leap OpenXR example more closely:
+
+1. Freeze QR-driven BoardAnchor updates immediately when LOCK is selected.
+2. Show `ANCHORING...`.
+3. Wait up to 5 seconds for the loaded `XRAnchorSubsystem`.
+4. Add the `ARAnchor` only after the subsystem is available.
+5. Wait up to 5 seconds for the anchor to reach `Tracking`.
+6. Show `LOCKED` on success or `ANCHOR FAILED - RESCAN` on failure.
+
+Failures are also logged with the subsystem/anchor state so device logcat can distinguish configuration failure from tracking failure.

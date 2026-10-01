@@ -10,7 +10,8 @@ namespace VACExperiment.Board
         Ready,
         TooFar,
         Locking,
-        Locked
+        Locked,
+        AnchorError
     }
 
     /// <summary>
@@ -54,6 +55,7 @@ namespace VACExperiment.Board
         private GameObject tooFarStateObject;
         private GameObject lockingStateObject;
         private GameObject lockedStateObject;
+        private GameObject anchorErrorStateObject;
         private BoardDistanceState lastLoggedState = (BoardDistanceState)(-1);
         private VacLevel lastLoggedCondition = (VacLevel)(-1);
 
@@ -158,9 +160,14 @@ namespace VACExperiment.Board
             {
                 // Keep live head-to-board distance even after the board is anchored.
                 ActualDistanceMeters = Vector3.Distance(viewer.position, boardAnchor.position);
-                CurrentState = boardRegistration.IsSpatialAnchorTracking
-                    ? BoardDistanceState.Locked
-                    : BoardDistanceState.Locking;
+
+                if (boardRegistration.HasSpatialAnchorLockFailed)
+                    CurrentState = BoardDistanceState.AnchorError;
+                else
+                    CurrentState = boardRegistration.IsSpatialAnchorTracking
+                        ? BoardDistanceState.Locked
+                        : BoardDistanceState.Locking;
+
                 return;
             }
 
@@ -273,6 +280,14 @@ namespace VACExperiment.Board
                 42,
                 "LOCKED").gameObject;
 
+            anchorErrorStateObject = CreateText(
+                panel.transform,
+                "StateAnchorError",
+                new Vector3(0f, 0.120f, 0f),
+                0.0027f,
+                36,
+                "ANCHOR FAILED - RESCAN").gameObject;
+
             CreateButton(panel.transform, "C1", new Vector3(-0.10f, -0.025f, 0f), SelectC1);
             CreateButton(panel.transform, "C2", new Vector3(0f, -0.025f, 0f), SelectC2);
             CreateButton(panel.transform, "C3", new Vector3(0.10f, -0.025f, 0f), SelectC3);
@@ -345,7 +360,8 @@ namespace VACExperiment.Board
                 readyStateObject == null ||
                 tooFarStateObject == null ||
                 lockingStateObject == null ||
-                lockedStateObject == null)
+                lockedStateObject == null ||
+                anchorErrorStateObject == null)
                 return;
 
             conditionText.text =
@@ -364,6 +380,7 @@ namespace VACExperiment.Board
             tooFarStateObject.SetActive(CurrentState == BoardDistanceState.TooFar);
             lockingStateObject.SetActive(CurrentState == BoardDistanceState.Locking);
             lockedStateObject.SetActive(CurrentState == BoardDistanceState.Locked);
+            anchorErrorStateObject.SetActive(CurrentState == BoardDistanceState.AnchorError);
         }
 
         private void LogConditionSelection()

@@ -1,9 +1,11 @@
 using System;
+using System.Collections;
 using MagicLeap.OpenXR.Features.MarkerUnderstanding;
 using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using UnityEngine.XR.Management;
 using UnityEngine.XR.OpenXR;
 
 namespace VACExperiment.Board
@@ -54,6 +56,8 @@ namespace VACExperiment.Board
             spatialAnchor != null &&
             !spatialAnchor.pending &&
             spatialAnchor.trackingState == TrackingState.Tracking;
+        public bool HasSpatialAnchorLockFailed { get; private set; }
+        public string SpatialAnchorLockError { get; private set; }
         public float SecondsSinceMarkerSeen =>
             HasRegisteredBoard ? Time.unscaledTime - lastMarkerSeenTime : float.PositiveInfinity;
 
@@ -69,6 +73,9 @@ namespace VACExperiment.Board
         private float lastMarkerSeenTime = float.NegativeInfinity;
         private ARAnchorManager anchorManager;
         private ARAnchor spatialAnchor;
+        private Coroutine spatialAnchorLockRoutine;
+        private const float SpatialAnchorLoadTimeoutSeconds = 5f;
+        private const float SpatialAnchorTrackingTimeoutSeconds = 5f;
 
         public void Configure(XROrigin origin, Transform anchor)
         {
@@ -217,28 +224,115 @@ namespace VACExperiment.Board
             if (!HasRegisteredBoard)
                 return false;
 
-            if (spatialAnchor != null)
-                Destroy(spatialAnchor);
+            if (spatialAnchorLockRoutine != null)
+                StopCoroutine(spatialAnchorLockRoutine);
 
-            // Magic Leap's OpenXR Spatial Anchor Subsystem is the official
-            // world-locking mechanism. Add the anchor at the already validated
-            // BoardAnchor pose rather than trying to freeze a plain Transform.
+            if (spatialAnchor != null)
+            {
+                Destroy(spatialAnchor);
+                spatialAnchor = null;
+            }
+
+            HasSpatialAnchorLockFailed = false;
+            SpatialAnchorLockError = string.Empty;
+
+            // Freeze QR-driven pose updates immediately so the validated pose
+            // cannot move while the official spatial-anchor subsystem becomes ready.
+            IsPoseLocked = true;
+            spatialAnchorLockRoutine = StartCoroutine(CreateSpatialAnchorWhenReady());
+
+            Debug.Log(
+                $"M2 board pose lock requested at position={boardAnchor.position}, " +
+                $"rotation={boardAnchor.rotation.eulerAngles}. Waiting for XRAnchorSubsystem.");
+            return true;
+        }
+
+        private IEnumerator CreateSpatialAnchorWhenReady()
+        {
+            float subsystemDeadline = Time.unscaledTime + SpatialAnchorLoadTimeoutSeconds;
+
+            while (!IsSpatialAnchorSubsystemLoaded() &&
+                   Time.unscaledTime < subsystemDeadline)
+            {
+                yield return null;
+            }
+
+            if (!IsSpatialAnchorSubsystemLoaded())
+            {
+                FailSpatialAnchorLock(
+                    "XRAnchorSubsystem did not load within the timeout. " +
+                    "Verify the Magic Leap Spatial Anchor OpenXR feature.");
+                yield break;
+            }
+
+            if (anchorManager == null)
+            {
+                FailSpatialAnchorLock("ARAnchorManager is unavailable on the XR Origin.");
+                yield break;
+            }
+
             spatialAnchor = boardAnchor.GetComponent<ARAnchor>();
             if (spatialAnchor == null)
                 spatialAnchor = boardAnchor.gameObject.AddComponent<ARAnchor>();
 
-            IsPoseLocked = true;
-
             Debug.Log(
-                $"M2 board pose lock requested at position={boardAnchor.position}, " +
-                $"rotation={boardAnchor.rotation.eulerAngles}; " +
-                $"spatialAnchorPending={spatialAnchor.pending}.");
-            return true;
+                $"M2 spatial anchor component created; pending={spatialAnchor.pending}, " +
+                $"trackingState={spatialAnchor.trackingState}.");
+
+            float trackingDeadline = Time.unscaledTime + SpatialAnchorTrackingTimeoutSeconds;
+
+            while (!IsSpatialAnchorTracking &&
+                   Time.unscaledTime < trackingDeadline)
+            {
+                yield return null;
+            }
+
+            if (!IsSpatialAnchorTracking)
+            {
+                FailSpatialAnchorLock(
+                    $"Spatial anchor did not reach Tracking. " +
+                    $"pending={(spatialAnchor != null && spatialAnchor.pending)}, " +
+                    $"trackingState={(spatialAnchor != null ? spatialAnchor.trackingState.ToString() : "missing")}.");
+                yield break;
+            }
+
+            spatialAnchorLockRoutine = null;
+            Debug.Log(
+                $"M2 spatial anchor TRACKING at position={boardAnchor.position}, " +
+                $"rotation={boardAnchor.rotation.eulerAngles}.");
+        }
+
+        private static bool IsSpatialAnchorSubsystemLoaded()
+        {
+            if (XRGeneralSettings.Instance == null ||
+                XRGeneralSettings.Instance.Manager == null ||
+                XRGeneralSettings.Instance.Manager.activeLoader == null)
+                return false;
+
+            return XRGeneralSettings.Instance.Manager.activeLoader
+                .GetLoadedSubsystem<XRAnchorSubsystem>() != null;
+        }
+
+        private void FailSpatialAnchorLock(string reason)
+        {
+            HasSpatialAnchorLockFailed = true;
+            SpatialAnchorLockError = reason;
+            spatialAnchorLockRoutine = null;
+
+            Debug.LogError($"M2 spatial anchor lock failed: {reason}");
         }
 
         public void UnlockBoardPose()
         {
+            if (spatialAnchorLockRoutine != null)
+            {
+                StopCoroutine(spatialAnchorLockRoutine);
+                spatialAnchorLockRoutine = null;
+            }
+
             IsPoseLocked = false;
+            HasSpatialAnchorLockFailed = false;
+            SpatialAnchorLockError = string.Empty;
 
             if (spatialAnchor != null)
             {
@@ -252,6 +346,12 @@ namespace VACExperiment.Board
 
         private void OnDestroy()
         {
+            if (spatialAnchorLockRoutine != null)
+            {
+                StopCoroutine(spatialAnchorLockRoutine);
+                spatialAnchorLockRoutine = null;
+            }
+
             if (spatialAnchor != null)
             {
                 Destroy(spatialAnchor);
