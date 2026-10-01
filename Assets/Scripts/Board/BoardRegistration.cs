@@ -77,6 +77,15 @@ namespace VACExperiment.Board
         private const float SpatialAnchorLoadTimeoutSeconds = 5f;
         private const float SpatialAnchorTrackingTimeoutSeconds = 5f;
 
+        [Header("Diagnostics")]
+        [Tooltip("While LOCKED and the QR remains visible, compare the live marker pose with the spatially anchored board pose.")]
+        [SerializeField] private bool logLockedRegistrationDiagnostics = true;
+
+        [Min(0.1f)]
+        [SerializeField] private float diagnosticLogIntervalSeconds = 0.5f;
+
+        private float nextDiagnosticLogTime;
+
         public void Configure(XROrigin origin, Transform anchor)
         {
             xrOrigin = origin;
@@ -172,8 +181,12 @@ namespace VACExperiment.Board
                 if (!data.MarkerPose.HasValue)
                     continue;
 
+                Pose markerWorldPose = GetMarkerWorldPose(data.MarkerPose.Value);
+
                 if (!IsPoseLocked)
-                    ApplyMarkerPose(data.MarkerPose.Value);
+                    ApplyMarkerWorldPose(markerWorldPose);
+                else if (IsSpatialAnchorTracking)
+                    LogLockedRegistrationDiagnostic(markerWorldPose);
 
                 IsMarkerVisible = true;
                 HasRegisteredBoard = true;
@@ -191,7 +204,7 @@ namespace VACExperiment.Board
             }
         }
 
-        private void ApplyMarkerPose(Pose markerPose)
+        private Pose GetMarkerWorldPose(Pose markerPose)
         {
             Transform originTransform = xrOrigin.CameraFloorOffsetObject != null
                 ? xrOrigin.CameraFloorOffsetObject.transform
@@ -203,12 +216,17 @@ namespace VACExperiment.Board
             Quaternion markerWorldRotation =
                 originTransform.rotation * markerPose.rotation;
 
+            return new Pose(markerWorldPosition, markerWorldRotation);
+        }
+
+        private void ApplyMarkerWorldPose(Pose markerWorldPose)
+        {
             Vector3 boardWorldPosition =
-                markerWorldPosition +
-                markerWorldRotation * markerToBoardPositionMeters;
+                markerWorldPose.position +
+                markerWorldPose.rotation * markerToBoardPositionMeters;
 
             Quaternion boardWorldRotation =
-                markerWorldRotation *
+                markerWorldPose.rotation *
                 Quaternion.Euler(markerToBoardEulerDegrees);
 
             boardAnchor.SetPositionAndRotation(
@@ -217,6 +235,45 @@ namespace VACExperiment.Board
 
             if (!boardAnchor.gameObject.activeSelf)
                 boardAnchor.gameObject.SetActive(true);
+        }
+
+        private void LogLockedRegistrationDiagnostic(Pose liveMarkerWorldPose)
+        {
+            if (!logLockedRegistrationDiagnostics ||
+                Time.unscaledTime < nextDiagnosticLogTime)
+                return;
+
+            nextDiagnosticLogTime =
+                Time.unscaledTime + Mathf.Max(0.1f, diagnosticLogIntervalSeconds);
+
+            Vector3 expectedBoardPosition =
+                liveMarkerWorldPose.position +
+                liveMarkerWorldPose.rotation * markerToBoardPositionMeters;
+
+            Vector3 error = boardAnchor.position - expectedBoardPosition;
+            float totalErrorMm = error.magnitude * 1000f;
+
+            Transform viewerTransform = Camera.main != null
+                ? Camera.main.transform
+                : null;
+
+            float depthErrorMm = float.NaN;
+            if (viewerTransform != null)
+            {
+                Vector3 viewDirection =
+                    (expectedBoardPosition - viewerTransform.position).normalized;
+
+                // Positive means the anchored virtual board is farther from the
+                // viewer than the current live QR-derived board plane.
+                depthErrorMm = Vector3.Dot(error, viewDirection) * 1000f;
+            }
+
+            Debug.Log(
+                $"M2 registration diagnostic: " +
+                $"anchorVsLiveMarkerTotal={totalErrorMm:F1} mm; " +
+                $"anchorVsLiveMarkerDepth={depthErrorMm:F1} mm " +
+                $"(positive=virtual plane farther/behind QR); " +
+                $"markerToBoard={markerToBoardPositionMeters}.");
         }
 
         public bool LockCurrentBoardPose()
