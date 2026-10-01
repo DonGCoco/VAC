@@ -161,3 +161,12 @@ The lock path now follows the Magic Leap OpenXR example more closely:
 6. Show `LOCKED` on success or `ANCHOR FAILED - RESCAN` on failure.
 
 Failures are also logged with the subsystem/anchor state so device logcat can distinguish configuration failure from tracking failure.
+
+
+## Validation status
+
+M2 software flow is implemented and device-tested through QR detection, C1/C2/C3 distance states, READY, LOCK, and Magic Leap spatial-anchor stabilization.
+
+Absolute physical-depth accuracy is intentionally still pending. The current screen-displayed QR is only a development proxy, and no independent physical measurement has yet verified that an SDK-reported 0.80 / 1.00 / 1.50 m board distance exactly matches the real eye-to-board distance.
+
+Before pilot data collection, repeat the calibration with the final rigid board, a measured printed QR, and an independent physical distance measurement. Do not compensate for any future measured bias with an arbitrary hidden Z offset; resolve it in the registration/calibration layer.
