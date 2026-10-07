@@ -248,6 +248,18 @@ namespace VACExperiment
             ShowTrial();
         }
 
+        // Editor-only compatibility for KeyboardDebugInput. Formal ML2 input uses
+        // controller-ray target selection; these methods are not shown to participants.
+        public void SubmitLeft()
+        {
+            Submit(ResponseSide.Left);
+        }
+
+        public void SubmitRight()
+        {
+            Submit(ResponseSide.Right);
+        }
+
         private void Submit(ResponseSide response)
         {
             if (!IsRunning)
