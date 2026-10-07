@@ -62,3 +62,17 @@ Defaults:
 If the experiment network blocks broadcast, set `ExperimenterBridge.experimenterHost` in Unity to the laptop's IPv4 address. No experiment logic depends on a specific IP address.
 
 Android `INTERNET` permission is included in the app manifest.
+
+
+## Device validation status
+
+Validated with the Magic Leap 2 and experiment laptop:
+
+- The experimenter laptop receives live target/actual distance and Too Close / Ready / Too Far state.
+- The experimenter can verbally guide the participant while the participant keeps wearing the headset.
+- LOCK can be issued from the laptop after READY.
+- The spatial anchor reaches LOCKED.
+- The participant-side START control appears only after LOCKED.
+- The participant can start the task without removing or re-fitting the headset.
+
+This experimenter-to-participant calibration handoff is accepted for continued integration.
