@@ -28,7 +28,7 @@ namespace VACExperiment
             EnsureHeader(eventsPath,
                 "timestamp,participant_id,event,condition,detail");
             EnsureHeader(depthPath,
-                "timestamp,participant_id,condition,phase,trial,reference_depth_m,depth_difference_m,closer_side,response,correct,reaction_time_s");
+                "timestamp,participant_id,condition,phase,trial,reference_depth_m,depth_difference_m,correct_side,response,correct,reaction_time_s");
             EnsureHeader(tetrisPath,
                 "timestamp,participant_id,condition,sequence,duration_s,score,lines_cleared,lines_per_minute,pieces_placed,average_placement_time_s,top_outs");
 

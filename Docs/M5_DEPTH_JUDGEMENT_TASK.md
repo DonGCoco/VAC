@@ -34,12 +34,13 @@ The targets do not follow the participant's head after trial onset.
 
 ## Input
 
-The task reuses the official Magic Leap OpenXR controller action map already used elsewhere in the project.
+Each trial asks:
 
-- click the left side of the trackpad -> choose LEFT
-- click the right side of the trackpad -> choose RIGHT
+`WHICH ONE IS FARTHER?`
 
-No custom controller stack is introduced.
+The participant uses the existing Magic Leap XR controller ray to point at the target they judge to be farther away, then presses the trigger to select it.
+
+Each target uses `XRSimpleInteractable`, reusing the same XR Interaction Toolkit / Magic Leap controller ray-selection path already validated for the experiment UI. There is no left/right button mapping to remember.
 
 ## M5 device-test transition
 
@@ -71,12 +72,12 @@ Console output also prints the actual near/far depths for device validation.
 
 1. Run the normal board calibration and START Tetris.
 2. Press Menu to end Tetris early for testing.
-3. Tetris should disappear and two spheres should appear.
-4. Do not move the controller: the spheres must remain visible and must not fall/move.
-5. Click the left or right side of the trackpad to answer.
+3. Tetris should disappear and two spheres plus the prompt `WHICH ONE IS FARTHER?` should appear.
+4. The spheres must remain visible and must not fall/move.
+5. Point the controller ray at the sphere judged farther away and press trigger.
 6. A new randomized trial appears immediately.
 7. Complete all 8 trials.
 8. Confirm the targets disappear and the console reports `M5 depth task complete`.
 9. Verify the generated `M5_TEST_*_depth.csv` contains 8 rows.
 
-Success means two targets are presented, side assignment is randomized, responses work, reaction time and accuracy are recorded, and the task is independent from BoardAnchor.
+Success means two targets are presented, the farther target is randomized left/right, ray+trigger selection works, reaction time and accuracy are recorded, and the task is independent from BoardAnchor.

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using VACExperiment.Tetris;
 
 namespace VACExperiment
@@ -45,17 +46,18 @@ namespace VACExperiment
         public bool IsRunning { get; private set; }
         public VacLevel CurrentCondition { get; private set; }
         public int CurrentTrialNumber => IsRunning ? trialIndex + 1 : 0;
-        public int TrialCount => closerSides?.Count ?? 0;
+        public int TrialCount => fartherSides?.Count ?? 0;
 
         private DepthPhase phase;
         private float referenceDepth;
-        private List<ResponseSide> closerSides;
+        private List<ResponseSide> fartherSides;
         private int trialIndex;
         private float stimulusOnsetTime;
 
         private Vector3 leftReferenceScale;
         private Vector3 rightReferenceScale;
         private Renderer[] tetrisRenderers;
+        private GameObject promptObject;
 
         private void Awake()
         {
@@ -68,7 +70,12 @@ namespace VACExperiment
             if (rightTarget != null)
                 rightReferenceScale = rightTarget.localScale;
 
+            ConfigureTargetInteraction(leftTarget, ResponseSide.Left);
+            ConfigureTargetInteraction(rightTarget, ResponseSide.Right);
+            CreatePrompt();
+
             SetTargetsVisible(false);
+            SetPromptVisible(false);
         }
 
         private void Start()
@@ -116,12 +123,46 @@ namespace VACExperiment
             target.name = objectName;
             target.transform.SetParent(transform, false);
             target.transform.localScale = Vector3.one * config.depthTargetDiameterMeters;
+            return target.transform;
+        }
+
+        private void ConfigureTargetInteraction(Transform target, ResponseSide side)
+        {
+            if (target == null)
+                return;
 
             Collider collider = target.GetComponent<Collider>();
-            if (collider != null)
-                Destroy(collider);
+            if (collider == null)
+                collider = target.gameObject.AddComponent<SphereCollider>();
 
-            return target.transform;
+            XRSimpleInteractable interactable =
+                target.GetComponent<XRSimpleInteractable>() ??
+                target.gameObject.AddComponent<XRSimpleInteractable>();
+
+            interactable.selectEntered.RemoveAllListeners();
+            interactable.selectEntered.AddListener(_ => Submit(side));
+        }
+
+        private void CreatePrompt()
+        {
+            if (viewer == null)
+                return;
+
+            Transform existing = viewer.Find("M5_DepthPrompt");
+            if (existing != null)
+                Destroy(existing.gameObject);
+
+            promptObject = new GameObject("M5_DepthPrompt");
+            promptObject.transform.SetParent(viewer, false);
+            promptObject.transform.localPosition = new Vector3(0f, 0.12f, 0.70f);
+            promptObject.transform.localRotation = Quaternion.identity;
+
+            TextMesh prompt = promptObject.AddComponent<TextMesh>();
+            prompt.anchor = TextAnchor.MiddleCenter;
+            prompt.alignment = TextAlignment.Center;
+            prompt.characterSize = 0.0028f;
+            prompt.fontSize = 42;
+            prompt.text = "WHICH ONE IS FARTHER?\nPoint and press trigger";
         }
 
         private void HandleTetrisCompleted()
@@ -195,7 +236,7 @@ namespace VACExperiment
             // Fixed outcome task: the same depths are used after every VAC block.
             referenceDepth = config.depthTaskReferenceDistanceMeters;
 
-            closerSides = BuildBalancedOrder(trialCount);
+            fartherSides = BuildBalancedOrder(trialCount);
             trialIndex = 0;
             IsRunning = true;
 
@@ -207,23 +248,13 @@ namespace VACExperiment
             ShowTrial();
         }
 
-        public void SubmitLeft()
-        {
-            Submit(ResponseSide.Left);
-        }
-
-        public void SubmitRight()
-        {
-            Submit(ResponseSide.Right);
-        }
-
         private void Submit(ResponseSide response)
         {
             if (!IsRunning)
                 return;
 
             float reactionTime = Time.realtimeSinceStartup - stimulusOnsetTime;
-            ResponseSide correctSide = closerSides[trialIndex];
+            ResponseSide correctSide = fartherSides[trialIndex];
             bool correct = response == correctSide;
 
             float nearDepth = GetNearDepth();
@@ -244,17 +275,18 @@ namespace VACExperiment
             }
 
             Debug.Log(
-                $"M5 depth trial {trialIndex + 1}/{closerSides.Count}: " +
+                $"M5 depth trial {trialIndex + 1}/{fartherSides.Count}: " +
                 $"near={nearDepth:F3} m; far={farDepth:F3} m; " +
-                $"closer={correctSide}; response={response}; correct={correct}; " +
+                $"farther={correctSide}; response={response}; correct={correct}; " +
                 $"rt={reactionTime:F3}s.");
 
             trialIndex++;
 
-            if (trialIndex >= closerSides.Count)
+            if (trialIndex >= fartherSides.Count)
             {
                 IsRunning = false;
                 SetTargetsVisible(false);
+                SetPromptVisible(false);
                 Debug.Log("M5 depth task complete.");
                 onBlockCompleted?.Invoke();
                 return;
@@ -265,7 +297,7 @@ namespace VACExperiment
 
         private void ShowTrial()
         {
-            ResponseSide closerSide = closerSides[trialIndex];
+            ResponseSide fartherSide = fartherSides[trialIndex];
 
             Vector3 forward = viewer.forward.normalized;
             Vector3 right = viewer.right.normalized;
@@ -274,8 +306,8 @@ namespace VACExperiment
             float nearDepth = GetNearDepth();
             float farDepth = GetFarDepth();
 
-            float leftDepth = closerSide == ResponseSide.Left ? nearDepth : farDepth;
-            float rightDepth = closerSide == ResponseSide.Right ? nearDepth : farDepth;
+            float leftDepth = fartherSide == ResponseSide.Left ? farDepth : nearDepth;
+            float rightDepth = fartherSide == ResponseSide.Right ? farDepth : nearDepth;
 
             // Capture the viewer pose once at trial onset. The targets are world-fixed
             // for the rest of that trial and do not follow subsequent head movement.
@@ -289,6 +321,7 @@ namespace VACExperiment
             ApplyConstantAngularSize(rightTarget, rightReferenceScale, rightDepth);
 
             SetTargetsVisible(true);
+            SetPromptVisible(true);
             stimulusOnsetTime = Time.realtimeSinceStartup;
         }
 
@@ -319,6 +352,12 @@ namespace VACExperiment
 
             if (rightTarget != null)
                 rightTarget.gameObject.SetActive(visible);
+        }
+
+        private void SetPromptVisible(bool visible)
+        {
+            if (promptObject != null)
+                promptObject.SetActive(visible);
         }
 
         private static List<ResponseSide> BuildBalancedOrder(int count)
