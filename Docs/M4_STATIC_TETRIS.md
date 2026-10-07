@@ -82,3 +82,20 @@ The in-headset calibration controls are no longer the default experiment flow.
 The participant wears the headset while the experimenter watches a separate laptop monitor with the live target/actual distance and Ready state. The experimenter gives verbal closer/farther instructions, clicks LOCK when Ready, and only then does START appear inside the headset for the participant.
 
 See `Docs/EXPERIMENTER_REALTIME_FLOW.md`.
+
+
+## Device validation status
+
+Validated on Magic Leap 2:
+
+- START enters the static Tetris test.
+- The active piece does not fall automatically.
+- Trackpad left/right movement works.
+- Trigger rotation works.
+- Bumper hard drop / placement works.
+- A new piece appears after placement.
+- The task remains attached to the registered board plane.
+- C1/C2/C3 continue to change the full Tetris visual size without moving it in depth.
+- The M4 interaction path is accepted for continued integration.
+
+Milestone 4 is therefore accepted for implementation/device behavior. Formal participant flow and experimenter-side distance control are validated separately.
