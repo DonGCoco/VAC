@@ -21,10 +21,11 @@ MonoBehaviour:
   visualAngleReferenceDistanceMeters: 1
   tetrisDurationSeconds: 900
   depthTaskReferenceDistanceMeters: 1
-  formalDepthTrials: 10
+  formalDepthTrials: 8
   practiceDepthTrials: 3
-  depthDifferenceMeters: 0.03
+  depthDifferenceMeters: 0.06
   targetHorizontalSeparationMeters: 0.12
+  depthTargetDiameterMeters: 0.04
   targetReferenceScaleDistanceMeters: 1
   lowVacDistance: 1
   highVacDistance: 2

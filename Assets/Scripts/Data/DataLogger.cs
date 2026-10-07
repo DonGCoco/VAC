@@ -71,6 +71,31 @@ namespace VACExperiment
                 F(reactionTimeSeconds)));
         }
 
+        public void LogDepthTrial(
+            VacLevel condition,
+            string phase,
+            int trial,
+            float referenceDepthMeters,
+            float depthDifferenceMeters,
+            string closerSide,
+            string response,
+            bool correct,
+            float reactionTimeSeconds)
+        {
+            Append(depthPath, string.Join(",",
+                Csv(Timestamp()),
+                Csv(ParticipantId),
+                Csv(condition.ToString()),
+                Csv(phase),
+                trial.ToString(CultureInfo.InvariantCulture),
+                F(referenceDepthMeters),
+                F(depthDifferenceMeters),
+                Csv(closerSide),
+                Csv(response),
+                correct ? "1" : "0",
+                F(reactionTimeSeconds)));
+        }
+
         public void LogTetrisSummary(
             VacCondition condition,
             TetrisSequenceId sequence,

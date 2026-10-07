@@ -43,15 +43,18 @@ namespace VACExperiment
         [Tooltip("Current depth-task reference distance. Kept separate from the physical-board calibration.")]
         [Min(0.05f)] public float depthTaskReferenceDistanceMeters = 1.0f;
 
-        [Tooltip("Pilot target is approximately 8–12 formal trials.")]
-        [Range(2, 40)] public int formalDepthTrials = 10;
+        [Tooltip("Formal depth-judgement trials per block. Current candidate is 8.")]
+        [Range(2, 40)] public int formalDepthTrials = 8;
 
         [Range(1, 10)] public int practiceDepthTrials = 3;
 
-        [Tooltip("Total near/far separation around the reference depth.")]
-        [Min(0.001f)] public float depthDifferenceMeters = 0.03f;
+        [Tooltip("Total near/far separation around the reference depth. 0.06 m gives 0.97 / 1.03 m around a 1.00 m reference.")]
+        [Min(0.001f)] public float depthDifferenceMeters = 0.06f;
 
         [Min(0.01f)] public float targetHorizontalSeparationMeters = 0.12f;
+
+        [Tooltip("Target sphere diameter at targetReferenceScaleDistanceMeters.")]
+        [Min(0.005f)] public float depthTargetDiameterMeters = 0.04f;
 
         [Tooltip("The target's authored scale is treated as correct at this distance.")]
         [Min(0.05f)] public float targetReferenceScaleDistanceMeters = 1.0f;
