@@ -398,7 +398,6 @@ MonoBehaviour:
   calibration: {fileID: 1800000003}
   boardRegistration: {fileID: 1700000003}
   tetrisManager: {fileID: 1700000027}
-  experimenterHost: 255.255.255.255
   statusPort: 45555
   commandPort: 45556
   statusIntervalSeconds: 0.1

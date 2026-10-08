@@ -3,13 +3,16 @@
 VAC experimenter monitor.
 
 Standard-library only:
-- receives live calibration state from the Magic Leap 2 over UDP
+- actively discovers the Magic Leap 2 on the local network
+- receives live calibration state from the headset over UDP
 - serves a local browser UI for the experimenter
 - sends C1/C2/C3, LOCK and RESCAN commands back to the headset
 
+No laptop IP is stored in the Unity project.
 START intentionally remains inside the headset for the participant.
 """
 
+import argparse
 import json
 import socket
 import threading
@@ -21,11 +24,14 @@ STATUS_PORT = 45555
 COMMAND_PORT = 45556
 HTTP_HOST = "127.0.0.1"
 HTTP_PORT = 8765
+DISCOVERY_INTERVAL_SECONDS = 0.75
+DISCOVERY_MESSAGE = f"VAC_MONITOR_DISCOVER:{STATUS_PORT}".encode("utf-8")
 
 state_lock = threading.Lock()
 latest_status = {}
 headset_address = None
 last_seen = 0.0
+manual_headset_ip = None
 
 PAGE = r"""<!doctype html>
 <html>
@@ -51,7 +57,7 @@ button:disabled { opacity: .35; }
 <div class="sub">Participant wears the headset. Experimenter watches this screen and gives verbal distance instructions.</div>
 
 <div class="card">
-  <div id="connection">Waiting for headset…</div>
+  <div id="connection">Searching for headset…</div>
   <div class="row">
     <button id="c1" onclick="cmd('C1')">C1 · 0.80 m</button>
     <button id="c2" onclick="cmd('C2')">C2 · 1.00 m</button>
@@ -64,7 +70,7 @@ button:disabled { opacity: .35; }
   <div class="actual" id="actual">Actual —</div>
   <div id="target">Target —</div>
   <div class="state" id="state">WAITING</div>
-  <div id="instruction">Ask participant to hold still while the marker is acquired.</div>
+  <div id="instruction">Searching for the Magic Leap 2 on the local network.</div>
 </div>
 
 <div class="card">
@@ -97,7 +103,7 @@ async function refresh() {
 
     const connected = !!s.connected;
     document.getElementById('connection').textContent =
-      connected ? ('Headset connected · ' + s.headset_ip) : 'Waiting for headset…';
+      connected ? ('Headset connected · ' + s.headset_ip) : 'Searching for headset…';
 
     if (connected && s.data) {
       const d = s.data;
@@ -127,6 +133,10 @@ async function refresh() {
       document.getElementById('c2').disabled = disableConditions;
       document.getElementById('c3').disabled = disableConditions;
       document.getElementById('rescan').disabled = !!d.tetris_running;
+    } else {
+      document.getElementById('lock').disabled = true;
+      document.getElementById('instruction').textContent =
+        'Searching automatically. Headset and laptop must be on a network that allows local device communication.';
     }
   } catch (e) {}
   setTimeout(refresh, 100);
@@ -139,6 +149,7 @@ refresh();
 
 def udp_receiver():
     global latest_status, headset_address, last_seen
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(("", STATUS_PORT))
@@ -154,6 +165,24 @@ def udp_receiver():
             latest_status = data
             headset_address = address[0]
             last_seen = time.time()
+
+def discovery_sender():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+    while True:
+        targets = [("255.255.255.255", COMMAND_PORT)]
+
+        if manual_headset_ip:
+            targets.append((manual_headset_ip, COMMAND_PORT))
+
+        for target in targets:
+            try:
+                sock.sendto(DISCOVERY_MESSAGE, target)
+            except OSError:
+                pass
+
+        time.sleep(DISCOVERY_INTERVAL_SECONDS)
 
 def send_command(command):
     with state_lock:
@@ -229,13 +258,33 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="VAC experimenter monitor")
+    parser.add_argument(
+        "--headset-ip",
+        help=(
+            "Optional fallback for networks that block broadcast discovery. "
+            "No Unity rebuild is required."
+        ),
+    )
+    return parser.parse_args()
+
 def main():
+    global manual_headset_ip
+
+    args = parse_args()
+    manual_headset_ip = args.headset_ip
+
     threading.Thread(target=udp_receiver, daemon=True).start()
+    threading.Thread(target=discovery_sender, daemon=True).start()
 
     url = f"http://{HTTP_HOST}:{HTTP_PORT}"
     print(f"VAC Experimenter Monitor: {url}")
     print(f"Listening for headset status on UDP {STATUS_PORT}.")
-    print("Headset and laptop must be on the same network.")
+    print(f"Automatically discovering headset on UDP {COMMAND_PORT}.")
+    if manual_headset_ip:
+        print(f"Fallback discovery target: {manual_headset_ip}")
+    print("Headset and laptop must be on a network that allows local device communication.")
     print("Press Ctrl+C to stop.")
 
     threading.Timer(0.5, lambda: webbrowser.open(url)).start()

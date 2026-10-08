@@ -10,20 +10,23 @@ namespace VACExperiment
 {
     /// <summary>
     /// Small UDP bridge for the external experimenter monitor.
-    /// The headset continuously publishes live calibration state; the laptop may
-    /// select C1/C2/C3 and issue LOCK/RESCAN. START deliberately stays participant-side.
+    ///
+    /// The laptop discovers the headset by broadcasting a VAC monitor discovery
+    /// packet to the headset command port. The headset learns the sender IP from
+    /// that packet and then unicasts live status back to the laptop.
+    ///
+    /// This avoids hard-coding any experimenter computer IP into the Unity build.
     /// </summary>
     public class ExperimenterBridge : MonoBehaviour
     {
+        private const string DiscoveryPrefix = "VAC_MONITOR_DISCOVER";
+
         [Header("References")]
         [SerializeField] private BoardDistanceCalibration calibration;
         [SerializeField] private BoardRegistration boardRegistration;
         [SerializeField] private TetrisManager tetrisManager;
 
         [Header("Network")]
-        [Tooltip("Laptop IPv4 address. Broadcast is convenient for development; set the experiment laptop IP if the lab network blocks broadcast.")]
-        [SerializeField] private string experimenterHost = "255.255.255.255";
-
         [SerializeField, Range(1024, 65535)] private int statusPort = 45555;
         [SerializeField, Range(1024, 65535)] private int commandPort = 45556;
         [SerializeField, Min(0.05f)] private float statusIntervalSeconds = 0.10f;
@@ -68,27 +71,17 @@ namespace VACExperiment
                 return;
             }
 
-            if (!IPAddress.TryParse(experimenterHost, out IPAddress hostAddress))
-            {
-                Debug.LogError(
-                    $"ExperimenterBridge host '{experimenterHost}' is not a valid IPv4 address.");
-                enabled = false;
-                return;
-            }
-
             try
             {
-                statusEndpoint = new IPEndPoint(hostAddress, statusPort);
                 statusSender = new UdpClient();
-                statusSender.EnableBroadcast = true;
 
                 commandReceiver = new UdpClient(commandPort);
                 commandReceiver.Client.Blocking = false;
 
                 initialized = true;
                 Debug.Log(
-                    $"ExperimenterBridge ready: status->{experimenterHost}:{statusPort}, " +
-                    $"commands<-:{commandPort}.");
+                    $"ExperimenterBridge ready: waiting for monitor discovery on UDP {commandPort}; " +
+                    $"status port={statusPort}.");
             }
             catch (Exception exception)
             {
@@ -105,7 +98,7 @@ namespace VACExperiment
 
             ReceiveCommands();
 
-            if (Time.unscaledTime >= nextStatusTime)
+            if (statusEndpoint != null && Time.unscaledTime >= nextStatusTime)
             {
                 nextStatusTime = Time.unscaledTime + Mathf.Max(0.05f, statusIntervalSeconds);
                 SendStatus();
@@ -114,6 +107,9 @@ namespace VACExperiment
 
         private void SendStatus()
         {
+            if (statusEndpoint == null)
+                return;
+
             var status = new ExperimenterStatus
             {
                 condition = calibration.CurrentCondition.ToString(),
@@ -157,8 +153,12 @@ namespace VACExperiment
                 try
                 {
                     byte[] payload = commandReceiver.Receive(ref remote);
-                    string command = Encoding.UTF8.GetString(payload).Trim().ToUpperInvariant();
-                    HandleCommand(command);
+                    string message = Encoding.UTF8.GetString(payload).Trim();
+
+                    if (TryHandleDiscovery(message, remote))
+                        continue;
+
+                    HandleCommand(message.ToUpperInvariant(), remote);
                 }
                 catch (SocketException exception)
                 {
@@ -173,8 +173,52 @@ namespace VACExperiment
             }
         }
 
-        private void HandleCommand(string command)
+        private bool TryHandleDiscovery(string message, IPEndPoint remote)
         {
+            if (!message.StartsWith(DiscoveryPrefix, StringComparison.Ordinal))
+                return false;
+
+            int requestedStatusPort = statusPort;
+            string[] parts = message.Split(':');
+
+            if (parts.Length >= 2 &&
+                int.TryParse(parts[1], out int parsedPort) &&
+                parsedPort >= 1024 &&
+                parsedPort <= 65535)
+            {
+                requestedStatusPort = parsedPort;
+            }
+
+            bool changed =
+                statusEndpoint == null ||
+                !statusEndpoint.Address.Equals(remote.Address) ||
+                statusEndpoint.Port != requestedStatusPort;
+
+            statusEndpoint = new IPEndPoint(remote.Address, requestedStatusPort);
+            nextStatusTime = 0f;
+
+            if (changed)
+            {
+                Debug.Log(
+                    $"ExperimenterBridge paired with monitor at " +
+                    $"{statusEndpoint.Address}:{statusEndpoint.Port}.");
+            }
+
+            // Reply immediately so the browser does not wait for the next interval.
+            SendStatus();
+            return true;
+        }
+
+        private void HandleCommand(string command, IPEndPoint remote)
+        {
+            // Once paired, only accept experiment commands from the paired laptop.
+            if (statusEndpoint == null || !statusEndpoint.Address.Equals(remote.Address))
+            {
+                Debug.LogWarning(
+                    $"ExperimenterBridge ignored command '{command}' from unpaired host {remote.Address}.");
+                return;
+            }
+
             switch (command)
             {
                 case "C1":
@@ -207,6 +251,7 @@ namespace VACExperiment
             commandReceiver?.Close();
             statusSender = null;
             commandReceiver = null;
+            statusEndpoint = null;
         }
     }
 }
