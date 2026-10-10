@@ -66,6 +66,9 @@ namespace VACExperiment
             Phase == FormalExperimentPhase.Recovery &&
             RecoveryRemainingSeconds <= 0f;
 
+        public bool DevelopmentShortcutsAvailable =>
+            Debug.isDebugBuild || Application.isEditor;
+
         private float recoveryStartTime;
         private bool listenersAttached;
 
@@ -189,6 +192,34 @@ namespace VACExperiment
             calibration.RescanBoard();
             recoveryStartTime = Time.realtimeSinceStartup;
             SetPhase(FormalExperimentPhase.Recovery, "RecoveryStarted");
+        }
+
+        public void SkipRecoveryForDevelopment()
+        {
+            if (!DevelopmentShortcutsAvailable)
+            {
+                Debug.LogWarning("Development recovery skip is unavailable in non-development builds.");
+                return;
+            }
+
+            if (Phase != FormalExperimentPhase.Recovery)
+            {
+                Debug.LogWarning(
+                    $"Development recovery skip ignored during phase {Phase}.");
+                return;
+            }
+
+            float minimum = config != null ? config.minimumRecoverySeconds : 0f;
+            recoveryStartTime = Time.realtimeSinceStartup - minimum;
+
+            dataLogger?.LogEvent(
+                "DevelopmentRecoverySkipped",
+                participantSession != null && participantSession.CurrentBlockIndex >= 1
+                    ? participantSession.GetConditionForBlock(participantSession.CurrentBlockIndex).ToString()
+                    : "",
+                $"Block={CurrentBlockIndex}");
+
+            ContinueAfterRecovery();
         }
 
         public void ContinueAfterRecovery()
