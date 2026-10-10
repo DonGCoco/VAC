@@ -59,10 +59,25 @@ button:disabled { opacity: .35; }
 <div class="card">
   <div id="connection">Searching for headset…</div>
   <div class="row">
+    <input id="participantId" placeholder="Participant ID (e.g. P001)"
+      style="font-size:18px;padding:10px 12px;border:1px solid #888;border-radius:9px;min-width:230px;">
+    <select id="groupOverride"
+      style="font-size:18px;padding:10px 12px;border:1px solid #888;border-radius:9px;background:white;">
+      <option value="AUTO">Group: Auto</option>
+      <option value="G1">Override G1</option>
+      <option value="G2">Override G2</option>
+      <option value="G3">Override G3</option>
+    </select>
+    <button onclick="assignParticipant()">ASSIGN</button>
+  </div>
+  <div id="participant" style="margin-top:12px;">Participant —</div>
+  <div id="assignment">Group / order —</div>
+  <div class="row">
     <button id="c1" onclick="cmd('C1')">C1 · 0.80 m</button>
     <button id="c2" onclick="cmd('C2')">C2 · 1.00 m</button>
     <button id="c3" onclick="cmd('C3')">C3 · 1.50 m</button>
   </div>
+  <div class="small">C1/C2/C3 buttons remain as a development fallback while M6 is being integrated.</div>
 </div>
 
 <div class="card">
@@ -92,6 +107,13 @@ async function cmd(command) {
   });
 }
 
+async function assignParticipant() {
+  const id = document.getElementById('participantId').value.trim();
+  const group = document.getElementById('groupOverride').value;
+  if (!id) return;
+  await cmd('PARTICIPANT:' + id + ':' + group);
+}
+
 function metres(v) {
   return (typeof v === 'number' && isFinite(v)) ? v.toFixed(3) + ' m' : '—';
 }
@@ -107,6 +129,11 @@ async function refresh() {
 
     if (connected && s.data) {
       const d = s.data;
+      document.getElementById('participant').textContent =
+        d.participant_id ? ('Participant ' + d.participant_id) : 'Participant —';
+      document.getElementById('assignment').textContent =
+        d.group ? (d.group + ' · ' + d.condition_order) : 'Group / order —';
+
       document.getElementById('condition').textContent = 'Condition ' + d.condition;
       document.getElementById('actual').textContent = 'Actual ' + metres(d.actual_m);
       document.getElementById('target').textContent = 'Target ' + metres(d.target_m);
@@ -243,7 +270,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(400)
             return
 
-        if command not in {"C1", "C2", "C3", "LOCK", "RESCAN"}:
+        is_participant_command = command.startswith("PARTICIPANT:")
+        if command not in {"C1", "C2", "C3", "LOCK", "RESCAN"} and not is_participant_command:
             self.send_error(400)
             return
 
