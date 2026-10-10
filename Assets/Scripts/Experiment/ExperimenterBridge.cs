@@ -60,6 +60,7 @@ namespace VACExperiment
             public string phase;
             public float recovery_remaining_s;
             public bool recovery_ready;
+            public bool development_shortcuts;
         }
 
         private void Start()
@@ -171,7 +172,9 @@ namespace VACExperiment
                             : "",
                 phase = formalFlow != null ? formalFlow.PhaseLabel : "",
                 recovery_remaining_s = formalFlow != null ? formalFlow.RecoveryRemainingSeconds : 0f,
-                recovery_ready = formalFlow != null && formalFlow.RecoveryMinimumSatisfied
+                recovery_ready = formalFlow != null && formalFlow.RecoveryMinimumSatisfied,
+                development_shortcuts =
+                    formalFlow != null && formalFlow.DevelopmentShortcutsAvailable
             };
 
             string json = JsonUtility.ToJson(status);
@@ -363,6 +366,9 @@ namespace VACExperiment
                     break;
                 case "RECOVERY_DONE":
                     formalFlow?.ContinueAfterRecovery();
+                    break;
+                case "DEV_SKIP_RECOVERY":
+                    formalFlow?.SkipRecoveryForDevelopment();
                     break;
                 default:
                     Debug.LogWarning($"ExperimenterBridge ignored unknown command '{command}'.");
