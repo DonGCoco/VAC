@@ -26,6 +26,7 @@ namespace VACExperiment
         [SerializeField] private BoardRegistration boardRegistration;
         [SerializeField] private TetrisManager tetrisManager;
         [SerializeField] private ParticipantSession participantSession;
+        [SerializeField] private FormalExperimentFlowController formalFlow;
 
         [Header("Network")]
         [SerializeField, Range(1024, 65535)] private int statusPort = 45555;
@@ -56,6 +57,9 @@ namespace VACExperiment
             public string condition_order;
             public int block;
             public string sequence;
+            public string phase;
+            public float recovery_remaining_s;
+            public bool recovery_ready;
         }
 
         private void Start()
@@ -77,6 +81,14 @@ namespace VACExperiment
                 GameObject sessionObject = new("M6_ParticipantSession");
                 participantSession = sessionObject.AddComponent<ParticipantSession>();
             }
+
+            if (formalFlow == null)
+                formalFlow = FindAnyObjectByType<FormalExperimentFlowController>();
+
+            if (formalFlow == null)
+                formalFlow = participantSession.gameObject.AddComponent<FormalExperimentFlowController>();
+
+            formalFlow.SetParticipantSession(participantSession);
 
             if (calibration == null || boardRegistration == null)
             {
@@ -138,18 +150,28 @@ namespace VACExperiment
                 start_available =
                     calibration.CurrentState == BoardDistanceState.Locked &&
                     boardRegistration.IsSpatialAnchorTracking &&
-                    (tetrisManager == null || !tetrisManager.IsRunning),
+                    (tetrisManager == null || !tetrisManager.IsRunning) &&
+                    (formalFlow == null || !formalFlow.HasActiveParticipant || formalFlow.ParticipantStartAllowed),
                 seconds_since_marker_seen = boardRegistration.SecondsSinceMarkerSeen,
                 participant_id = participantSession != null ? participantSession.ParticipantId : "",
                 group = participantSession != null ? participantSession.GroupLabel : "",
                 condition_order = participantSession != null ? participantSession.ConditionOrderLabel : "",
                 block = participantSession != null ? participantSession.CurrentBlockIndex : 0,
                 sequence =
-                    participantSession != null &&
-                    participantSession.HasAssignment &&
-                    participantSession.CurrentBlockIndex >= 1
-                        ? participantSession.GetSequenceForBlock(participantSession.CurrentBlockIndex).ToString()
-                        : ""
+                    formalFlow != null &&
+                    formalFlow.HasActiveParticipant &&
+                    (formalFlow.Phase == FormalExperimentPhase.WarmupCalibration ||
+                     formalFlow.Phase == FormalExperimentPhase.WarmupTetris ||
+                     formalFlow.Phase == FormalExperimentPhase.WarmupDepthPractice)
+                        ? "T"
+                        : participantSession != null &&
+                          participantSession.HasAssignment &&
+                          participantSession.CurrentBlockIndex >= 1
+                            ? participantSession.GetSequenceForBlock(participantSession.CurrentBlockIndex).ToString()
+                            : "",
+                phase = formalFlow != null ? formalFlow.PhaseLabel : "",
+                recovery_remaining_s = formalFlow != null ? formalFlow.RecoveryRemainingSeconds : 0f,
+                recovery_ready = formalFlow != null && formalFlow.RecoveryMinimumSatisfied
             };
 
             string json = JsonUtility.ToJson(status);
@@ -285,7 +307,11 @@ namespace VACExperiment
 
             try
             {
-                participantSession.Assign(participantId, groupOverride);
+                if (formalFlow != null)
+                    formalFlow.AssignParticipant(participantId, groupOverride);
+                else
+                    participantSession.Assign(participantId, groupOverride);
+
                 SendStatus();
             }
             catch (Exception exception)
@@ -309,19 +335,34 @@ namespace VACExperiment
             switch (command)
             {
                 case "C1":
-                    calibration.SelectC1();
-                    break;
                 case "C2":
-                    calibration.SelectC2();
-                    break;
                 case "C3":
-                    calibration.SelectC3();
+                    if (formalFlow != null && formalFlow.HasActiveParticipant)
+                    {
+                        Debug.LogWarning(
+                            $"ExperimenterBridge ignored manual {command} during active M6 session.");
+                        return;
+                    }
+
+                    if (command == "C1")
+                        calibration.SelectC1();
+                    else if (command == "C2")
+                        calibration.SelectC2();
+                    else
+                        calibration.SelectC3();
                     break;
+
                 case "LOCK":
                     calibration.LockBoardPose();
                     break;
                 case "RESCAN":
                     calibration.RescanBoard();
+                    break;
+                case "CONTINUE":
+                    formalFlow?.ContinueAfterQuestionnaire();
+                    break;
+                case "RECOVERY_DONE":
+                    formalFlow?.ContinueAfterRecovery();
                     break;
                 default:
                     Debug.LogWarning($"ExperimenterBridge ignored unknown command '{command}'.");
