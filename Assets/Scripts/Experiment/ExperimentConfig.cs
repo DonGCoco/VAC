@@ -12,6 +12,10 @@ namespace VACExperiment
     [CreateAssetMenu(fileName = "ExperimentConfig", menuName = "VAC Experiment/Experiment Config")]
     public class ExperimentConfig : ScriptableObject
     {
+        [Header("Protocol")]
+        [Tooltip("Human-readable study/protocol version stored with every M7 session.")]
+        public string protocolVersion = "M7";
+
         [Header("VAC conditions (meters)")]
         [Tooltip("Optical focal distance of the Magic Leap 2 setup. Keep configurable until final confirmation.")]
         [Min(0.05f)] public float focalDistanceMeters = 0.74f;
