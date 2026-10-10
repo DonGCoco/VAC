@@ -86,6 +86,8 @@ namespace VACExperiment.Tetris
             if (dataLogger == null)
                 dataLogger = FindAnyObjectByType<DataLogger>();
 
+            SetVisualsVisible(true);
+
             sequenceId = newSequence;
             sequenceIndex = 0;
             score = 0;
@@ -155,6 +157,12 @@ namespace VACExperiment.Tetris
         {
             if (IsRunning)
                 EndSession();
+        }
+
+        public void SetVisualsVisible(bool visible)
+        {
+            foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
+                renderer.enabled = visible;
         }
 
         public void LockCurrentPiece()
