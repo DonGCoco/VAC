@@ -66,28 +66,42 @@ After participant assignment, the monitor shows:
 
 This confirms that the formal session logger has started.
 
-## Pull data from Magic Leap 2
+## Automatic export to the experimenter computer
 
-From the repository root:
+The experimenter monitor now auto-exports the current session as soon as the headset reports `Complete`.
+
+Requirements:
+
+- the experimenter monitor is running
+- the Magic Leap 2 is still visible to `adb` (USB or the same adb connection used for Build And Run)
+
+The monitor copies only the completed session folder to:
+
+`<repo>/CollectedData/<session_id>/`
+
+For example:
+
+`~/Desktop/VAC/CollectedData/P002_20261011_012345678/`
+
+It then runs `Tools/validate_vac_session.py` automatically.
+
+The browser reports:
+
+- `Data export · COPYING TO COMPUTER…`
+- then `Data export · SAVED · Validation PASS` or `FAIL`
+
+The manual pull helper remains available only as a fallback:
 
 ```bash
 bash Tools/pull_vac_data.sh
 ```
 
-The script uses `adb` from PATH when available and otherwise falls back to the Unity 6000.2.15f1 Android SDK path used by this project.
+## Manual validation fallback
 
-You can optionally choose the local output directory:
-
-```bash
-bash Tools/pull_vac_data.sh ~/Desktop/VAC_DryRun
-```
-
-## Validate one session
-
-After pulling the data, run:
+Automatic validation runs after export. If needed, it can still be rerun manually:
 
 ```bash
-python3 Tools/validate_vac_session.py /path/to/P002_YYYYMMDD_HHMMSSmmm
+python3 Tools/validate_vac_session.py CollectedData/P002_YYYYMMDD_HHMMSSmmm
 ```
 
 The validator checks:
@@ -117,7 +131,8 @@ Recommended next device validation:
 6. Use `SKIP RECOVERY (DEV ONLY)` in a Development Build.
 7. Complete all formal depth trials in all three blocks.
 8. Reach `Complete`.
-9. Pull the data.
-10. Run `validate_vac_session.py`.
+9. Confirm the monitor automatically shows `Data export · SAVED`.
+10. Confirm automatic validation reports `PASS`.
+11. Open `CollectedData/<session_id>/` and verify the five CSV files are present.
 
-M7 is not considered device-validated until the pulled session returns `RESULT: PASS`.
+M7 is not considered device-validated until the auto-exported session returns `Validation PASS`.
