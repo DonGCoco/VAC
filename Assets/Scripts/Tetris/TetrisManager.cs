@@ -44,13 +44,16 @@ namespace VACExperiment.Tetris
         private float currentPieceSpawnTime;
         private float sessionStartTime;
         private float inputEnabledTime;
+        private float sessionDurationSeconds;
+        private bool isTrainingSession;
 
         // Compatibility entry point for the old two-condition flow.
         public void BeginSession(VacCondition newCondition, TetrisSequenceId newSequence)
         {
             legacyCondition = newCondition;
             useLegacyConditionLogging = true;
-            BeginSessionInternal(newSequence);
+            isTrainingSession = false;
+            BeginSessionInternal(newSequence, config != null ? config.tetrisDurationSeconds : 0f);
         }
 
         // New C1/C2/C3 experiment entry point.
@@ -58,16 +61,30 @@ namespace VACExperiment.Tetris
         {
             vacLevel = newCondition;
             useLegacyConditionLogging = false;
-            BeginSessionInternal(newSequence);
+            isTrainingSession = false;
+            BeginSessionInternal(newSequence, config != null ? config.tetrisDurationSeconds : 0f);
         }
 
-        private void BeginSessionInternal(TetrisSequenceId newSequence)
+        public void BeginTrainingSession(VacLevel trainingCondition)
+        {
+            vacLevel = trainingCondition;
+            useLegacyConditionLogging = false;
+            isTrainingSession = true;
+            BeginSessionInternal(
+                TetrisSequenceId.T,
+                config != null ? config.warmupTetrisDurationSeconds : 0f);
+        }
+
+        private void BeginSessionInternal(TetrisSequenceId newSequence, float durationSeconds)
         {
             if (config == null || board == null || sequenceManager == null)
             {
                 Debug.LogError("TetrisManager is missing required references.");
                 return;
             }
+
+            if (dataLogger == null)
+                dataLogger = FindAnyObjectByType<DataLogger>();
 
             sequenceId = newSequence;
             sequenceIndex = 0;
@@ -78,7 +95,8 @@ namespace VACExperiment.Tetris
             placementTimeTotal = 0f;
 
             board.ClearBoard();
-            RemainingSeconds = config.tetrisDurationSeconds;
+            sessionDurationSeconds = Mathf.Max(1f, durationSeconds);
+            RemainingSeconds = sessionDurationSeconds;
             sessionStartTime = Time.realtimeSinceStartup;
             inputEnabledTime = Time.unscaledTime + startInputGuardSeconds;
             IsRunning = true;
@@ -97,7 +115,7 @@ namespace VACExperiment.Tetris
 
             RemainingSeconds = Mathf.Max(
                 0f,
-                config.tetrisDurationSeconds - (Time.realtimeSinceStartup - sessionStartTime));
+                sessionDurationSeconds - (Time.realtimeSinceStartup - sessionStartTime));
 
             if (RemainingSeconds <= 0f)
                 EndSession();
@@ -212,19 +230,32 @@ namespace VACExperiment.Tetris
                 ? placementTimeTotal / piecesPlaced
                 : 0f;
 
-            // Formal C1/C2/C3 logging is deliberately deferred to the logging milestone.
-            // Keep compatibility with the old two-condition path for now.
-            if (useLegacyConditionLogging)
+            if (!isTrainingSession)
             {
-                dataLogger?.LogTetrisSummary(
-                    legacyCondition,
-                    sequenceId,
-                    duration,
-                    score,
-                    linesCleared,
-                    piecesPlaced,
-                    averagePlacementTime,
-                    topOuts);
+                if (useLegacyConditionLogging)
+                {
+                    dataLogger?.LogTetrisSummary(
+                        legacyCondition,
+                        sequenceId,
+                        duration,
+                        score,
+                        linesCleared,
+                        piecesPlaced,
+                        averagePlacementTime,
+                        topOuts);
+                }
+                else
+                {
+                    dataLogger?.LogTetrisSummary(
+                        vacLevel,
+                        sequenceId,
+                        duration,
+                        score,
+                        linesCleared,
+                        piecesPlaced,
+                        averagePlacementTime,
+                        topOuts);
+                }
             }
 
             Debug.Log(
