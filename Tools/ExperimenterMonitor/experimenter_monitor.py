@@ -161,7 +161,7 @@ async function refresh() {
       currentFlowCommand = null;
 
       if (d.phase === 'WarmupCalibration') {
-        flowInstruction = 'Warm-up: calibrate at C2, LOCK, then participant presses START. Training uses sequence T.';
+        flowInstruction = 'Warm-up: calibrate at the configured training condition, LOCK, then participant presses START. Training uses sequence T.';
       } else if (d.phase === 'WarmupTetris') {
         flowInstruction = 'Warm-up Tetris is running. Participant practices move / rotate / hard drop.';
       } else if (d.phase === 'WarmupDepthPractice') {
