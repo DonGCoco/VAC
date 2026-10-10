@@ -84,10 +84,10 @@ namespace VACExperiment
                 "timestamp_utc,participant_id,session_id,group,block,condition,sequence,focal_distance_m,target_distance_m,locked_distance_m,target_vac_d,locked_vac_d");
             EnsureHeader(
                 depthPath,
-                "timestamp_utc,participant_id,session_id,group,block,condition,sequence,phase,trial,reference_depth_m,depth_difference_m,near_depth_m,far_depth_m,correct_side,response,correct,reaction_time_s");
+                "timestamp_utc,participant_id,session_id,group,block,condition,sequence,focal_distance_m,target_distance_m,locked_distance_m,target_vac_d,locked_vac_d,phase,trial,reference_depth_m,depth_difference_m,near_depth_m,far_depth_m,correct_side,response,correct,reaction_time_s");
             EnsureHeader(
                 tetrisPath,
-                "timestamp_utc,participant_id,session_id,group,block,condition,sequence,focal_distance_m,target_distance_m,locked_distance_m,target_vac_d,locked_vac_d,duration_s,score,lines_cleared,lines_per_minute,pieces_placed,average_placement_time_s,top_outs,mean_viewing_distance_m,min_viewing_distance_m,max_viewing_distance_m");
+                "timestamp_utc,participant_id,session_id,group,block,condition,sequence,focal_distance_m,target_distance_m,locked_distance_m,target_vac_d,locked_vac_d,duration_s,score,lines_cleared,lines_per_minute,pieces_placed,average_placement_time_s,top_outs,mean_viewing_distance_m,min_viewing_distance_m,max_viewing_distance_m,mean_vac_d");
 
             LogEvent("SessionStarted", "", "");
             Debug.Log($"VAC M7 session folder: {sessionFolder}");
@@ -292,6 +292,11 @@ namespace VACExperiment
                 I(block),
                 Csv(rowCondition),
                 Csv(sequence),
+                OptionalF(focalDistanceMeters),
+                OptionalF(targetDistanceMeters),
+                OptionalF(lockedDistanceMeters),
+                OptionalF(VacMagnitudeDiopters(focalDistanceMeters, targetDistanceMeters)),
+                OptionalF(VacMagnitudeDiopters(focalDistanceMeters, lockedDistanceMeters)),
                 Csv(phase),
                 I(trial),
                 F(referenceDepthMeters),
@@ -342,7 +347,12 @@ namespace VACExperiment
                 I(topOuts),
                 NullableF(meanViewingDistanceMeters),
                 NullableF(minViewingDistanceMeters),
-                NullableF(maxViewingDistanceMeters)));
+                NullableF(maxViewingDistanceMeters),
+                meanViewingDistanceMeters.HasValue
+                    ? OptionalF(VacMagnitudeDiopters(
+                        focalDistanceMeters,
+                        meanViewingDistanceMeters.Value))
+                    : ""));
         }
 
         private void WriteSessionMetadata(ExperimentConfig config)
