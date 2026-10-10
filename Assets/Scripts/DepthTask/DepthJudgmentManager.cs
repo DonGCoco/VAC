@@ -34,6 +34,9 @@ namespace VACExperiment
         [SerializeField] private Transform rightTarget;
         [SerializeField] private DataLogger dataLogger;
 
+        [Header("Interaction")]
+        [SerializeField, Min(1f)] private float selectionHitRadiusMultiplier = 2.5f;
+
         [Header("M5 transition")]
         [SerializeField] private TetrisManager tetrisManager;
         [SerializeField] private ConditionController conditionController;
@@ -131,9 +134,15 @@ namespace VACExperiment
             if (target == null)
                 return;
 
-            Collider collider = target.GetComponent<Collider>();
-            if (collider == null)
-                collider = target.gameObject.AddComponent<SphereCollider>();
+            SphereCollider sphereCollider = target.GetComponent<SphereCollider>();
+            if (sphereCollider == null)
+                sphereCollider = target.gameObject.AddComponent<SphereCollider>();
+
+            // Keep the visible depth stimulus unchanged, but make controller-ray
+            // selection forgiving. A Unity primitive sphere has radius 0.5, so
+            // 2.5x gives a ~10 cm invisible hit diameter for the 4 cm target at 1 m.
+            // This improves response usability without changing the visual cue.
+            sphereCollider.radius = 0.5f * Mathf.Max(1f, selectionHitRadiusMultiplier);
 
             XRSimpleInteractable interactable =
                 target.GetComponent<XRSimpleInteractable>() ??
