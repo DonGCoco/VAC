@@ -87,6 +87,7 @@ button:disabled { opacity: .35; }
   <div id="recovery" class="small" style="margin-top:8px;"></div>
   <div class="row">
     <button id="flowAction" onclick="flowAction()" disabled>NEXT</button>
+    <button id="devSkipRecovery" onclick="cmd('DEV_SKIP_RECOVERY')" style="display:none;">SKIP RECOVERY (DEV ONLY)</button>
   </div>
 </div>
 
@@ -201,6 +202,10 @@ async function refresh() {
         d.phase === 'Recovery'
           ? ('Minimum recovery remaining: ' + Math.ceil(Math.max(0, Number(d.recovery_remaining_s || 0))) + ' s')
           : '';
+
+      const devSkip = document.getElementById('devSkipRecovery');
+      const showDevSkip = d.phase === 'Recovery' && !!d.development_shortcuts;
+      devSkip.style.display = showDevSkip ? 'inline-block' : 'none';
 
       document.getElementById('condition').textContent = 'Condition ' + d.condition;
       document.getElementById('actual').textContent = 'Actual ' + metres(d.actual_m);
@@ -339,7 +344,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         is_participant_command = command.startswith("PARTICIPANT:")
-        if command not in {"C1", "C2", "C3", "LOCK", "RESCAN", "CONTINUE", "RECOVERY_DONE"} and not is_participant_command:
+        if command not in {"C1", "C2", "C3", "LOCK", "RESCAN", "CONTINUE", "RECOVERY_DONE", "DEV_SKIP_RECOVERY"} and not is_participant_command:
             self.send_error(400)
             return
 
