@@ -24,3 +24,6 @@
 Assets/_Recovery/
 mono_crash.mem.*.blob
 Assets/_Recovery.meta
+
+# Local participant/session exports
+/CollectedData/
