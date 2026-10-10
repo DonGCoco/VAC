@@ -123,6 +123,33 @@ namespace VACExperiment
                 topOuts.ToString(CultureInfo.InvariantCulture)));
         }
 
+        public void LogTetrisSummary(
+            VacLevel condition,
+            TetrisSequenceId sequence,
+            float durationSeconds,
+            int score,
+            int linesCleared,
+            int piecesPlaced,
+            float averagePlacementTimeSeconds,
+            int topOuts)
+        {
+            float minutes = Mathf.Max(durationSeconds / 60f, 0.0001f);
+            float linesPerMinute = linesCleared / minutes;
+
+            Append(tetrisPath, string.Join(",",
+                Csv(Timestamp()),
+                Csv(ParticipantId),
+                Csv(condition.ToString()),
+                Csv(sequence.ToString()),
+                F(durationSeconds),
+                score.ToString(CultureInfo.InvariantCulture),
+                linesCleared.ToString(CultureInfo.InvariantCulture),
+                F(linesPerMinute),
+                piecesPlaced.ToString(CultureInfo.InvariantCulture),
+                F(averagePlacementTimeSeconds),
+                topOuts.ToString(CultureInfo.InvariantCulture)));
+        }
+
         private static string Timestamp()
         {
             return DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
