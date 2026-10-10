@@ -113,7 +113,12 @@ namespace VACExperiment
 
             participantSession.Assign(participantId, groupOverride);
             participantSession.SetCurrentBlock(0);
-            dataLogger.StartSession(participantSession.ParticipantId);
+            dataLogger.StartSession(
+                participantSession.ParticipantId,
+                participantSession.GroupLabel,
+                participantSession.ConditionOrderLabel,
+                config);
+            SetLoggerContextForWarmup(0f);
 
             dataLogger.LogEvent(
                 "ParticipantAssigned",
@@ -137,8 +142,13 @@ namespace VACExperiment
 
             if (Phase == FormalExperimentPhase.WarmupCalibration)
             {
-                SetPhase(FormalExperimentPhase.WarmupTetris, "WarmupStarted", config != null ? config.warmupCondition : VacLevel.C2);
-                tetrisManager.BeginTrainingSession(config != null ? config.warmupCondition : VacLevel.C2);
+                SetLoggerContextForWarmup(calibration.LockedDistanceMeters);
+                SetPhase(
+                    FormalExperimentPhase.WarmupTetris,
+                    "WarmupStarted",
+                    config != null ? config.warmupCondition : VacLevel.C2);
+                tetrisManager.BeginTrainingSession(
+                    config != null ? config.warmupCondition : VacLevel.C2);
                 return;
             }
 
@@ -148,6 +158,8 @@ namespace VACExperiment
                 VacLevel condition = participantSession.GetConditionForBlock(block);
                 TetrisSequenceId sequence = participantSession.GetSequenceForBlock(block);
 
+                SetLoggerContextForFormalBlock(block, calibration.LockedDistanceMeters);
+                dataLogger.LogBlockCalibration();
                 dataLogger.LogEvent(
                     "FormalBlockStarted",
                     condition.ToString(),
@@ -240,6 +252,7 @@ namespace VACExperiment
 
             int nextBlock = participantSession.CurrentBlockIndex + 1;
             participantSession.SetCurrentBlock(nextBlock);
+            SetLoggerContextForFormalBlock(nextBlock, 0f);
             SetPhase(
                 FormalExperimentPhase.PreBlockQuestionnaire,
                 "PreQuestionnaireReady",
@@ -305,6 +318,7 @@ namespace VACExperiment
             {
                 calibration.RescanBoard();
                 participantSession.SetCurrentBlock(1);
+                SetLoggerContextForFormalBlock(1, 0f);
                 SetPhase(
                     FormalExperimentPhase.PreBlockQuestionnaire,
                     "WarmupCompleted",
@@ -321,6 +335,39 @@ namespace VACExperiment
                 FormalExperimentPhase.PostBlockQuestionnaire,
                 "PostQuestionnaireReady",
                 condition);
+        }
+
+        private void SetLoggerContextForWarmup(float lockedMeters)
+        {
+            if (dataLogger == null || config == null)
+                return;
+
+            VacLevel warmup = config.warmupCondition;
+            dataLogger.SetBlockContext(
+                0,
+                warmup,
+                TetrisSequenceId.T,
+                config.focalDistanceMeters,
+                config.GetTargetDistance(warmup),
+                lockedMeters);
+        }
+
+        private void SetLoggerContextForFormalBlock(int blockIndex, float lockedMeters)
+        {
+            if (dataLogger == null || config == null || participantSession == null)
+                return;
+
+            VacLevel vacCondition = participantSession.GetConditionForBlock(blockIndex);
+            TetrisSequenceId tetrisSequence =
+                participantSession.GetSequenceForBlock(blockIndex);
+
+            dataLogger.SetBlockContext(
+                blockIndex,
+                vacCondition,
+                tetrisSequence,
+                config.focalDistanceMeters,
+                config.GetTargetDistance(vacCondition),
+                lockedMeters);
         }
 
         private void ResolveReferences()
