@@ -39,6 +39,13 @@ namespace VACExperiment
         [Tooltip("Formal exposure duration. Final value should be fixed after pilot testing.")]
         [Min(1f)] public float tetrisDurationSeconds = 900f;
 
+        [Tooltip("Warm-up Tetris duration using training sequence T. Kept configurable until the pilot.")]
+        [Min(10f)] public float warmupTetrisDurationSeconds = 180f;
+
+        [Header("Flow")]
+        [Tooltip("Minimum recovery interval between formal VAC blocks. The experimenter may wait longer.")]
+        [Min(0f)] public float minimumRecoverySeconds = 300f;
+
         [Header("Depth judgment")]
         [Tooltip("Current depth-task reference distance. Kept separate from the physical-board calibration.")]
         [Min(0.05f)] public float depthTaskReferenceDistanceMeters = 1.0f;
