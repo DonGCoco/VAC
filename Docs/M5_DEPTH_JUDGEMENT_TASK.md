@@ -40,7 +40,7 @@ Each trial asks:
 
 The participant uses the existing Magic Leap XR controller ray to point at the target they judge to be farther away, then presses the trigger to select it.
 
-Each target uses `XRSimpleInteractable`, reusing the same XR Interaction Toolkit / Magic Leap controller ray-selection path already validated for the experiment UI. There is no left/right button mapping to remember.
+Each target uses `XRSimpleInteractable`, reusing the same XR Interaction Toolkit / Magic Leap controller ray-selection path already validated for the experiment UI. There is no left/right button mapping to remember. The visible target size is unchanged, while the invisible sphere collider is enlarged for more forgiving ray selection on device.
 
 ## M5 device-test transition
 
@@ -81,3 +81,7 @@ Console output also prints the actual near/far depths for device validation.
 9. Verify the generated `M5_TEST_*_depth.csv` contains 8 rows.
 
 Success means two targets are presented, the farther target is randomized left/right, ray+trigger selection works, reaction time and accuracy are recorded, and the task is independent from BoardAnchor.
+
+## Validation status
+
+Device validation completed on Magic Leap 2. The two targets were visible and selectable with controller ray + trigger, all 8 trials could be completed, and the enlarged invisible hit area made left/right target selection practical without changing the visual stimulus geometry.
