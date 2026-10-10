@@ -25,6 +25,7 @@ namespace VACExperiment
         [SerializeField] private BoardDistanceCalibration calibration;
         [SerializeField] private BoardRegistration boardRegistration;
         [SerializeField] private TetrisManager tetrisManager;
+        [SerializeField] private ParticipantSession participantSession;
 
         [Header("Network")]
         [SerializeField, Range(1024, 65535)] private int statusPort = 45555;
@@ -50,6 +51,11 @@ namespace VACExperiment
             public bool tetris_running;
             public bool start_available;
             public float seconds_since_marker_seen;
+            public string participant_id;
+            public string group;
+            public string condition_order;
+            public int block;
+            public string sequence;
         }
 
         private void Start()
@@ -62,6 +68,15 @@ namespace VACExperiment
 
             if (tetrisManager == null)
                 tetrisManager = FindAnyObjectByType<TetrisManager>();
+
+            if (participantSession == null)
+                participantSession = FindAnyObjectByType<ParticipantSession>();
+
+            if (participantSession == null)
+            {
+                GameObject sessionObject = new("M6_ParticipantSession");
+                participantSession = sessionObject.AddComponent<ParticipantSession>();
+            }
 
             if (calibration == null || boardRegistration == null)
             {
@@ -124,7 +139,17 @@ namespace VACExperiment
                     calibration.CurrentState == BoardDistanceState.Locked &&
                     boardRegistration.IsSpatialAnchorTracking &&
                     (tetrisManager == null || !tetrisManager.IsRunning),
-                seconds_since_marker_seen = boardRegistration.SecondsSinceMarkerSeen
+                seconds_since_marker_seen = boardRegistration.SecondsSinceMarkerSeen,
+                participant_id = participantSession != null ? participantSession.ParticipantId : "",
+                group = participantSession != null ? participantSession.GroupLabel : "",
+                condition_order = participantSession != null ? participantSession.ConditionOrderLabel : "",
+                block = participantSession != null ? participantSession.CurrentBlockIndex : 0,
+                sequence =
+                    participantSession != null &&
+                    participantSession.HasAssignment &&
+                    participantSession.CurrentBlockIndex >= 1
+                        ? participantSession.GetSequenceForBlock(participantSession.CurrentBlockIndex).ToString()
+                        : ""
             };
 
             string json = JsonUtility.ToJson(status);
@@ -156,6 +181,9 @@ namespace VACExperiment
                     string message = Encoding.UTF8.GetString(payload).Trim();
 
                     if (TryHandleDiscovery(message, remote))
+                        continue;
+
+                    if (TryHandleParticipantAssignment(message, remote))
                         continue;
 
                     HandleCommand(message.ToUpperInvariant(), remote);
@@ -206,6 +234,65 @@ namespace VACExperiment
 
             // Reply immediately so the browser does not wait for the next interval.
             SendStatus();
+            return true;
+        }
+
+        private bool TryHandleParticipantAssignment(string message, IPEndPoint remote)
+        {
+            if (!message.StartsWith("PARTICIPANT:", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (statusEndpoint == null || !statusEndpoint.Address.Equals(remote.Address))
+            {
+                Debug.LogWarning(
+                    $"ExperimenterBridge ignored participant assignment from unpaired host {remote.Address}.");
+                return true;
+            }
+
+            string[] parts = message.Split(':');
+            if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[1]))
+            {
+                Debug.LogWarning("M6 participant assignment rejected: missing participant ID.");
+                return true;
+            }
+
+            string participantId = parts[1].Trim();
+            int groupOverride = 0;
+
+            if (parts.Length >= 3)
+            {
+                string groupToken = parts[2].Trim().ToUpperInvariant();
+                groupOverride = groupToken switch
+                {
+                    "" => 0,
+                    "AUTO" => 0,
+                    "G1" => 1,
+                    "1" => 1,
+                    "G2" => 2,
+                    "2" => 2,
+                    "G3" => 3,
+                    "3" => 3,
+                    _ => -1
+                };
+            }
+
+            if (groupOverride < 0)
+            {
+                Debug.LogWarning(
+                    $"M6 participant assignment rejected: invalid group override in '{message}'.");
+                return true;
+            }
+
+            try
+            {
+                participantSession.Assign(participantId, groupOverride);
+                SendStatus();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"M6 participant assignment rejected: {exception.Message}");
+            }
+
             return true;
         }
 
