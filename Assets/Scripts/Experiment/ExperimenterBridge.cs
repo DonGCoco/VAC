@@ -27,6 +27,7 @@ namespace VACExperiment
         [SerializeField] private TetrisManager tetrisManager;
         [SerializeField] private ParticipantSession participantSession;
         [SerializeField] private FormalExperimentFlowController formalFlow;
+        [SerializeField] private DataLogger dataLogger;
 
         [Header("Network")]
         [SerializeField, Range(1024, 65535)] private int statusPort = 45555;
@@ -61,6 +62,8 @@ namespace VACExperiment
             public float recovery_remaining_s;
             public bool recovery_ready;
             public bool development_shortcuts;
+            public bool logging_ready;
+            public string session_id;
         }
 
         private void Start()
@@ -76,6 +79,9 @@ namespace VACExperiment
 
             if (participantSession == null)
                 participantSession = FindAnyObjectByType<ParticipantSession>();
+
+            if (dataLogger == null)
+                dataLogger = FindAnyObjectByType<DataLogger>();
 
             if (participantSession == null)
             {
@@ -174,7 +180,9 @@ namespace VACExperiment
                 recovery_remaining_s = formalFlow != null ? formalFlow.RecoveryRemainingSeconds : 0f,
                 recovery_ready = formalFlow != null && formalFlow.RecoveryMinimumSatisfied,
                 development_shortcuts =
-                    formalFlow != null && formalFlow.DevelopmentShortcutsAvailable
+                    formalFlow != null && formalFlow.DevelopmentShortcutsAvailable,
+                logging_ready = dataLogger != null && dataLogger.HasSession,
+                session_id = dataLogger != null ? dataLogger.SessionId : ""
             };
 
             string json = JsonUtility.ToJson(status);
