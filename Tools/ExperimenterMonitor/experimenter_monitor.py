@@ -89,6 +89,7 @@ button:disabled { opacity: .35; }
     <button id="flowAction" onclick="flowAction()" disabled>NEXT</button>
     <button id="devSkipRecovery" onclick="cmd('DEV_SKIP_RECOVERY')" style="display:none;">SKIP RECOVERY (DEV ONLY)</button>
   </div>
+  <div id="commandStatus" class="small" style="margin-top:8px;"></div>
 </div>
 
 <div class="card">
@@ -113,11 +114,25 @@ button:disabled { opacity: .35; }
 let currentFlowCommand = null;
 
 async function cmd(command) {
-  await fetch('/command', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({command})
-  });
+  const status = document.getElementById('commandStatus');
+  try {
+    const response = await fetch('/command', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({command})
+    });
+
+    if (!response.ok) {
+      if (status) status.textContent = 'Command failed: ' + command + ' · HTTP ' + response.status;
+      return false;
+    }
+
+    if (status) status.textContent = 'Command sent: ' + command;
+    return true;
+  } catch (e) {
+    if (status) status.textContent = 'Command failed: ' + command + ' · ' + e;
+    return false;
+  }
 }
 
 async function assignParticipant() {
@@ -128,8 +143,10 @@ async function assignParticipant() {
 }
 
 async function flowAction() {
-  if (currentFlowCommand)
-    await cmd(currentFlowCommand);
+  const button = document.getElementById('flowAction');
+  const command = button.dataset.command || '';
+  if (command)
+    await cmd(command);
 }
 
 function metres(v) {
@@ -196,8 +213,10 @@ async function refresh() {
       }
 
       document.getElementById('flowInstruction').textContent = flowInstruction;
-      document.getElementById('flowAction').textContent = flowLabel;
-      document.getElementById('flowAction').disabled = !currentFlowCommand;
+      const flowButton = document.getElementById('flowAction');
+      flowButton.textContent = flowLabel;
+      flowButton.disabled = !currentFlowCommand;
+      flowButton.dataset.command = currentFlowCommand || '';
       document.getElementById('recovery').textContent =
         d.phase === 'Recovery'
           ? ('Minimum recovery remaining: ' + Math.ceil(Math.max(0, Number(d.recovery_remaining_s || 0))) + ' s')
