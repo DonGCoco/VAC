@@ -57,6 +57,9 @@ namespace VACExperiment
 
         private void Update()
         {
+            if (formalFlow == null)
+                formalFlow = FindAnyObjectByType<FormalExperimentFlowController>();
+
             bool locked =
                 calibration.CurrentState == BoardDistanceState.Locked &&
                 boardRegistration.IsSpatialAnchorTracking;
