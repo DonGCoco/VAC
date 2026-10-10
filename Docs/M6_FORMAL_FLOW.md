@@ -77,3 +77,34 @@ For the first M6 device test:
 11. Confirm Block 2 uses C2 + B, Block 3 uses C3 + C, then Complete.
 
 Do not mark M6 validated until the full three-block device flow has been completed once.
+
+## Development recovery shortcut
+
+For software-only end-to-end validation, Development Builds expose a monitor button:
+
+`SKIP RECOVERY (DEV ONLY)`
+
+It is only available when Unity reports a development/debug build (or in the Editor). It is not available in a normal non-development formal-study build. Using it logs a `DevelopmentRecoverySkipped` event.
+
+## Current validation status
+
+Validated on Magic Leap 2 through the first Recovery checkpoint:
+
+- participant assignment and automatic G1/G2/G3 order
+- warm-up calibration
+- training Tetris sequence T
+- depth practice
+- Pre-Block 1 questionnaire checkpoint
+- Block 1 calibration / LOCK / participant START
+- formal Tetris A
+- formal depth judgement
+- Post-SSQ + QoE checkpoint
+- entry into Recovery and the 300 s minimum gate/countdown
+
+Still requiring one fast end-to-end device validation:
+
+- Recovery -> Block 2 automatic progression
+- Block 2 condition + sequence B
+- second Recovery -> Block 3 automatic progression
+- Block 3 condition + sequence C
+- final Post-SSQ + QoE -> Complete
