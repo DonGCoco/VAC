@@ -193,6 +193,21 @@ namespace VACExperiment
             BeginFormal(level);
         }
 
+        public void SetMilestone5AutoStartEnabled(bool enabled)
+        {
+            autoStartAfterTetrisForMilestone5 = enabled;
+
+            if (tetrisManager == null)
+                tetrisManager = FindAnyObjectByType<TetrisManager>();
+
+            if (tetrisManager == null)
+                return;
+
+            tetrisManager.onSessionCompleted.RemoveListener(HandleTetrisCompleted);
+            if (enabled)
+                tetrisManager.onSessionCompleted.AddListener(HandleTetrisCompleted);
+        }
+
         public void BeginPractice(VacLevel practiceCondition)
         {
             BeginBlock(practiceCondition, DepthPhase.Practice, config.practiceDepthTrials);
