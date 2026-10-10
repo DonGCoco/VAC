@@ -14,8 +14,8 @@ START intentionally remains inside the headset for the participant.
 
 import argparse
 import json
-import os
 from pathlib import Path
+import re
 import shutil
 import socket
 import subprocess
@@ -27,6 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 STATUS_PORT = 45555
 COMMAND_PORT = 45556
+DATA_TRANSFER_PORT = 45557
 HTTP_HOST = "127.0.0.1"
 HTTP_PORT = 8765
 DISCOVERY_INTERVAL_SECONDS = 0.75
@@ -34,11 +35,13 @@ DISCOVERY_MESSAGE = f"VAC_MONITOR_DISCOVER:{STATUS_PORT}".encode("utf-8")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COLLECTED_DATA_ROOT = REPO_ROOT / "CollectedData"
-PACKAGE_ID = os.environ.get("VAC_PACKAGE_ID", "com.DefaultCompany.VAC")
-UNITY_ADB = Path(
-    "/Applications/Unity/Hub/Editor/6000.2.15f1/"
-    "PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb"
-)
+EXPECTED_SESSION_FILES = {
+    "session.csv",
+    "events.csv",
+    "blocks.csv",
+    "tetris.csv",
+    "depth_trials.csv",
+}
 
 state_lock = threading.Lock()
 latest_status = {}
@@ -52,8 +55,6 @@ export_status = {
     "path": "",
     "validation": "",
 }
-last_export_attempt = {}
-
 PAGE = r"""<!doctype html>
 <html>
 <head>
@@ -316,17 +317,6 @@ refresh();
 </html>
 """
 
-def _find_adb():
-    adb_on_path = shutil.which("adb")
-    if adb_on_path:
-        return adb_on_path
-
-    if UNITY_ADB.is_file():
-        return str(UNITY_ADB)
-
-    return None
-
-
 def _set_export_status(session_id, state, message="", path="", validation=""):
     global export_status
     with state_lock:
@@ -339,73 +329,115 @@ def _set_export_status(session_id, state, message="", path="", validation=""):
         }
 
 
-def _export_session_worker(session_id):
-    # Give the synchronous Unity CSV writes a brief margin before adb pulls.
-    time.sleep(0.5)
+def _readline(reader, limit=4096):
+    line = reader.readline(limit + 1)
+    if not line:
+        raise EOFError("connection closed while reading transfer header")
+    if len(line) > limit:
+        raise ValueError("transfer header line is too long")
+    return line.decode("utf-8").rstrip("\r\n")
 
-    adb = _find_adb()
-    if not adb:
-        _set_export_status(
-            session_id,
-            "error",
-            "adb not found on PATH or in the configured Unity Android SDK.",
-        )
-        return
 
-    remote_session = (
-        f"/sdcard/Android/data/{PACKAGE_ID}/files/"
-        f"VACExperimentData/{session_id}"
+def _read_exact(reader, size):
+    remaining = size
+    chunks = []
+    while remaining:
+        chunk = reader.read(min(65536, remaining))
+        if not chunk:
+            raise EOFError(
+                f"connection closed with {remaining} byte(s) still expected"
+            )
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _safe_session_id(value):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", value or ""):
+        raise ValueError(f"invalid session id '{value}'")
+    return value
+
+
+def _validate_received_session(local_session):
+    validator = REPO_ROOT / "Tools" / "validate_vac_session.py"
+    if not validator.is_file():
+        return "", "Session copied to computer; validator not found."
+
+    check = subprocess.run(
+        [sys.executable, str(validator), str(local_session)],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
-    local_session = COLLECTED_DATA_ROOT / session_id
+    validation = "PASS" if check.returncode == 0 else "FAIL"
+    summary = (check.stdout or check.stderr or "").strip()
+    return validation, summary[-1200:] if summary else f"Validation {validation}"
+
+
+def _receive_session(connection, address):
+    session_id = ""
+    incoming = None
 
     try:
-        COLLECTED_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        connection.settimeout(20)
+        reader = connection.makefile("rb")
 
-        state_check = subprocess.run(
-            [adb, "get-state"],
-            capture_output=True,
-            text=True,
-            timeout=10,
+        magic = _readline(reader)
+        if magic != "VAC_SESSION_V1":
+            raise ValueError(f"unsupported transfer protocol '{magic}'")
+
+        session_id = _safe_session_id(_readline(reader))
+        file_count = int(_readline(reader))
+        if file_count != len(EXPECTED_SESSION_FILES):
+            raise ValueError(
+                f"expected {len(EXPECTED_SESSION_FILES)} session files; got {file_count}"
+            )
+
+        _set_export_status(
+            session_id,
+            "running",
+            f"Receiving session over hotspot from {address[0]}…",
         )
-        if state_check.returncode != 0 or "device" not in state_check.stdout:
-            raise RuntimeError(
-                (state_check.stderr or state_check.stdout or "adb device not available").strip()
+
+        COLLECTED_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        incoming = COLLECTED_DATA_ROOT / f".incoming_{session_id}"
+        local_session = COLLECTED_DATA_ROOT / session_id
+
+        if incoming.exists():
+            shutil.rmtree(incoming)
+        incoming.mkdir(parents=True)
+
+        received = set()
+        for _ in range(file_count):
+            name = _readline(reader)
+            if name not in EXPECTED_SESSION_FILES:
+                raise ValueError(f"unexpected session file '{name}'")
+            if name in received:
+                raise ValueError(f"duplicate session file '{name}'")
+
+            size = int(_readline(reader))
+            if size < 0 or size > 50 * 1024 * 1024:
+                raise ValueError(f"invalid size {size} for '{name}'")
+
+            payload = _read_exact(reader, size)
+            (incoming / name).write_bytes(payload)
+            received.add(name)
+
+        if _readline(reader) != "END":
+            raise ValueError("session transfer did not end cleanly")
+
+        missing = EXPECTED_SESSION_FILES - received
+        if missing:
+            raise ValueError(
+                "missing session files: " + ", ".join(sorted(missing))
             )
 
         if local_session.exists():
             shutil.rmtree(local_session)
+        incoming.rename(local_session)
+        incoming = None
 
-        pull = subprocess.run(
-            [adb, "pull", remote_session, str(local_session)],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        if pull.returncode != 0:
-            raise RuntimeError(
-                (pull.stderr or pull.stdout or "adb pull failed").strip()
-            )
-
-        if not (local_session / "session.csv").is_file():
-            raise RuntimeError(
-                f"pull completed but session.csv was not found in {local_session}"
-            )
-
-        validator = REPO_ROOT / "Tools" / "validate_vac_session.py"
-        validation = ""
-        message = "Session copied to computer."
-
-        if validator.is_file():
-            check = subprocess.run(
-                [sys.executable, str(validator), str(local_session)],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            validation = "PASS" if check.returncode == 0 else "FAIL"
-            summary = (check.stdout or check.stderr or "").strip()
-            if summary:
-                message = summary[-1200:]
+        validation, message = _validate_received_session(local_session)
 
         _set_export_status(
             session_id,
@@ -414,53 +446,51 @@ def _export_session_worker(session_id):
             str(local_session),
             validation,
         )
-        print(f"Auto-exported VAC session: {local_session}")
+
+        acknowledgement = f"ACK {validation or 'SAVED'}\n".encode("utf-8")
+        connection.sendall(acknowledgement)
+
+        print(f"Wireless VAC session received: {local_session}")
         if validation:
             print(f"Automatic validation: {validation}")
 
     except Exception as exc:
-        _set_export_status(session_id, "error", str(exc))
-        print(f"Automatic VAC data export failed for {session_id}: {exc}")
+        if incoming is not None and incoming.exists():
+            shutil.rmtree(incoming, ignore_errors=True)
+
+        if session_id:
+            _set_export_status(session_id, "error", str(exc))
+
+        try:
+            connection.sendall(f"ERROR {exc}\n".encode("utf-8"))
+        except Exception:
+            pass
+
+        print(f"Wireless VAC session receive failed: {exc}")
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
 
 
-def maybe_start_auto_export(data):
-    if data.get("phase") != "Complete":
-        return
+def session_receiver():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("", DATA_TRANSFER_PORT))
+    server.listen(4)
 
-    if not data.get("logging_ready"):
-        return
+    print(
+        f"Listening for completed session files on TCP {DATA_TRANSFER_PORT}."
+    )
 
-    session_id = str(data.get("session_id") or "").strip()
-    if not session_id:
-        return
-
-    now = time.time()
-
-    with state_lock:
-        current_session = export_status.get("session_id", "")
-        current_state = export_status.get("state", "idle")
-
-        if current_session == session_id and current_state in {"running", "saved"}:
-            return
-
-        last_attempt = last_export_attempt.get(session_id, 0.0)
-        if current_session == session_id and current_state == "error" and now - last_attempt < 5.0:
-            return
-
-        last_export_attempt[session_id] = now
-        export_status.update({
-            "session_id": session_id,
-            "state": "running",
-            "message": "Copying session data from headset…",
-            "path": "",
-            "validation": "",
-        })
-
-    threading.Thread(
-        target=_export_session_worker,
-        args=(session_id,),
-        daemon=True,
-    ).start()
+    while True:
+        connection, address = server.accept()
+        threading.Thread(
+            target=_receive_session,
+            args=(connection, address),
+            daemon=True,
+        ).start()
 
 
 def udp_receiver():
@@ -481,8 +511,6 @@ def udp_receiver():
             latest_status = data
             headset_address = address[0]
             last_seen = time.time()
-
-        maybe_start_auto_export(data)
 
 def discovery_sender():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -597,6 +625,7 @@ def main():
 
     threading.Thread(target=udp_receiver, daemon=True).start()
     threading.Thread(target=discovery_sender, daemon=True).start()
+    threading.Thread(target=session_receiver, daemon=True).start()
 
     url = f"http://{HTTP_HOST}:{HTTP_PORT}"
     print(f"VAC Experimenter Monitor: {url}")
@@ -604,8 +633,9 @@ def main():
     print(f"Automatically discovering headset on UDP {COMMAND_PORT}.")
     if manual_headset_ip:
         print(f"Fallback discovery target: {manual_headset_ip}")
-    print("Headset and laptop must be on a network that allows local device communication.")
-    print(f"Completed sessions auto-export to: {COLLECTED_DATA_ROOT}")
+    print("Headset and laptop must be on the same private network/hotspot.")
+    print("Completed sessions transfer directly over the local network; USB/adb is not required.")
+    print(f"Completed sessions save to: {COLLECTED_DATA_ROOT}")
     print("Press Ctrl+C to stop.")
 
     threading.Timer(0.5, lambda: webbrowser.open(url)).start()
