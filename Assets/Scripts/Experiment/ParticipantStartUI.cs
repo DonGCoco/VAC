@@ -15,6 +15,7 @@ namespace VACExperiment
         [SerializeField] private BoardDistanceCalibration calibration;
         [SerializeField] private BoardRegistration boardRegistration;
         [SerializeField] private TetrisManager tetrisManager;
+        [SerializeField] private FormalExperimentFlowController formalFlow;
         [SerializeField] private Transform viewer;
 
         [Header("Placement")]
@@ -34,6 +35,9 @@ namespace VACExperiment
 
             if (tetrisManager == null)
                 tetrisManager = FindAnyObjectByType<TetrisManager>();
+
+            if (formalFlow == null)
+                formalFlow = FindAnyObjectByType<FormalExperimentFlowController>();
 
             if (viewer == null && Camera.main != null)
                 viewer = Camera.main.transform;
@@ -60,8 +64,12 @@ namespace VACExperiment
             if (!locked)
                 startConsumedForCurrentLock = false;
 
+            bool flowAllowsStart =
+                formalFlow == null || formalFlow.ParticipantStartAllowed;
+
             bool visible =
                 locked &&
+                flowAllowsStart &&
                 !tetrisManager.IsRunning &&
                 !startConsumedForCurrentLock;
 
@@ -128,7 +136,11 @@ namespace VACExperiment
 
             startConsumedForCurrentLock = true;
             startPanel.SetActive(false);
-            calibration.StartTetrisTest();
+
+            if (formalFlow != null && formalFlow.HasActiveParticipant)
+                formalFlow.HandleParticipantStart();
+            else
+                calibration.StartTetrisTest();
         }
     }
 }
