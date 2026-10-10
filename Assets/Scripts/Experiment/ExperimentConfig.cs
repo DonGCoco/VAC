@@ -39,6 +39,9 @@ namespace VACExperiment
         [Tooltip("Formal exposure duration. Final value should be fixed after pilot testing.")]
         [Min(1f)] public float tetrisDurationSeconds = 900f;
 
+        [Tooltip("Warm-up condition. C2 is the current comfortable training default; keep configurable until the pilot.")]
+        public VacLevel warmupCondition = VacLevel.C2;
+
         [Tooltip("Warm-up Tetris duration using training sequence T. Kept configurable until the pilot.")]
         [Min(10f)] public float warmupTetrisDurationSeconds = 180f;
 
