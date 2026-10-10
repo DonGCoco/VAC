@@ -81,6 +81,16 @@ button:disabled { opacity: .35; }
 </div>
 
 <div class="card">
+  <div id="phase" class="state">FLOW —</div>
+  <div id="block">Block — · Sequence —</div>
+  <div id="flowInstruction" style="font-size:18px;margin-top:10px;">Assign a participant to begin.</div>
+  <div id="recovery" class="small" style="margin-top:8px;"></div>
+  <div class="row">
+    <button id="flowAction" onclick="flowAction()" disabled>NEXT</button>
+  </div>
+</div>
+
+<div class="card">
   <div id="condition">Condition —</div>
   <div class="actual" id="actual">Actual —</div>
   <div id="target">Target —</div>
@@ -99,6 +109,8 @@ button:disabled { opacity: .35; }
 </div>
 
 <script>
+let currentFlowCommand = null;
+
 async function cmd(command) {
   await fetch('/command', {
     method: 'POST',
@@ -112,6 +124,11 @@ async function assignParticipant() {
   const group = document.getElementById('groupOverride').value;
   if (!id) return;
   await cmd('PARTICIPANT:' + id + ':' + group);
+}
+
+async function flowAction() {
+  if (currentFlowCommand)
+    await cmd(currentFlowCommand);
 }
 
 function metres(v) {
@@ -133,6 +150,57 @@ async function refresh() {
         d.participant_id ? ('Participant ' + d.participant_id) : 'Participant —';
       document.getElementById('assignment').textContent =
         d.group ? (d.group + ' · ' + d.condition_order) : 'Group / order —';
+      document.getElementById('phase').textContent =
+        'FLOW · ' + String(d.phase || 'Idle');
+      document.getElementById('block').textContent =
+        (d.block > 0 ? ('Block ' + d.block) : 'Warm-up') +
+        ' · Sequence ' + (d.sequence || '—');
+
+      let flowInstruction = '';
+      let flowLabel = 'NEXT';
+      currentFlowCommand = null;
+
+      if (d.phase === 'WarmupCalibration') {
+        flowInstruction = 'Warm-up: calibrate at C2, LOCK, then participant presses START. Training uses sequence T.';
+      } else if (d.phase === 'WarmupTetris') {
+        flowInstruction = 'Warm-up Tetris is running. Participant practices move / rotate / hard drop.';
+      } else if (d.phase === 'WarmupDepthPractice') {
+        flowInstruction = 'Warm-up depth practice: choose which target is farther with ray + trigger.';
+      } else if (d.phase === 'PreBlockQuestionnaire') {
+        flowInstruction = 'Complete the external Pre-SSQ for this block, then continue to calibration.';
+        flowLabel = 'PRE-SSQ DONE → CALIBRATION';
+        currentFlowCommand = 'CONTINUE';
+      } else if (d.phase === 'BlockCalibration') {
+        flowInstruction = 'Move the physical board to the target distance, wait for READY, then LOCK. Participant presses START.';
+      } else if (d.phase === 'FormalTetris') {
+        flowInstruction = 'Formal Tetris is running.';
+      } else if (d.phase === 'FormalDepth') {
+        flowInstruction = 'Formal depth judgement is running.';
+      } else if (d.phase === 'PostBlockQuestionnaire') {
+        flowInstruction = 'Complete external Post-SSQ + QoE, then continue.';
+        flowLabel = 'POST-SSQ + QoE DONE';
+        currentFlowCommand = 'CONTINUE';
+      } else if (d.phase === 'Recovery') {
+        const remain = Math.max(0, Number(d.recovery_remaining_s || 0));
+        flowInstruction = remain > 0
+          ? 'Recovery in progress. Minimum interval has not finished yet.'
+          : 'Minimum recovery finished. Continue only if the participant has recovered sufficiently.';
+        flowLabel = remain > 0 ? 'RECOVERY — WAIT' : 'RECOVERY COMPLETE';
+        if (d.recovery_ready) currentFlowCommand = 'RECOVERY_DONE';
+      } else if (d.phase === 'Complete') {
+        flowInstruction = 'Experiment complete. Save/check the session data before the participant leaves.';
+        flowLabel = 'COMPLETE';
+      } else {
+        flowInstruction = 'Assign a participant to begin the formal flow.';
+      }
+
+      document.getElementById('flowInstruction').textContent = flowInstruction;
+      document.getElementById('flowAction').textContent = flowLabel;
+      document.getElementById('flowAction').disabled = !currentFlowCommand;
+      document.getElementById('recovery').textContent =
+        d.phase === 'Recovery'
+          ? ('Minimum recovery remaining: ' + Math.ceil(Math.max(0, Number(d.recovery_remaining_s || 0))) + ' s')
+          : '';
 
       document.getElementById('condition').textContent = 'Condition ' + d.condition;
       document.getElementById('actual').textContent = 'Actual ' + metres(d.actual_m);
@@ -155,7 +223,7 @@ async function refresh() {
       document.getElementById('instruction').textContent = instruction;
 
       document.getElementById('lock').disabled = d.state !== 'Ready' || d.tetris_running;
-      const disableConditions = !!d.tetris_running;
+      const disableConditions = !!d.tetris_running || !!d.participant_id;
       document.getElementById('c1').disabled = disableConditions;
       document.getElementById('c2').disabled = disableConditions;
       document.getElementById('c3').disabled = disableConditions;
@@ -271,7 +339,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         is_participant_command = command.startswith("PARTICIPANT:")
-        if command not in {"C1", "C2", "C3", "LOCK", "RESCAN"} and not is_participant_command:
+        if command not in {"C1", "C2", "C3", "LOCK", "RESCAN", "CONTINUE", "RECOVERY_DONE"} and not is_participant_command:
             self.send_error(400)
             return
 
