@@ -72,6 +72,7 @@ button:disabled { opacity: .35; }
   </div>
   <div id="participant" style="margin-top:12px;">Participant —</div>
   <div id="assignment">Group / order —</div>
+  <div id="logging" class="small" style="margin-top:6px;">Logging —</div>
   <div class="row">
     <button id="c1" onclick="cmd('C1')">C1 · 0.80 m</button>
     <button id="c2" onclick="cmd('C2')">C2 · 1.00 m</button>
@@ -168,6 +169,10 @@ async function refresh() {
         d.participant_id ? ('Participant ' + d.participant_id) : 'Participant —';
       document.getElementById('assignment').textContent =
         d.group ? (d.group + ' · ' + d.condition_order) : 'Group / order —';
+      document.getElementById('logging').textContent =
+        d.logging_ready
+          ? ('Logging · ' + (d.session_id || 'active'))
+          : 'Logging —';
       document.getElementById('phase').textContent =
         'FLOW · ' + String(d.phase || 'Idle');
       document.getElementById('block').textContent =
