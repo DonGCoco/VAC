@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Events;
+using VACExperiment.Board;
 
 namespace VACExperiment.Tetris
 {
@@ -14,6 +15,7 @@ namespace VACExperiment.Tetris
         [SerializeField] private TetrisBoard board;
         [SerializeField] private TetrisSequenceManager sequenceManager;
         [SerializeField] private DataLogger dataLogger;
+        [SerializeField] private BoardDistanceCalibration boardDistanceCalibration;
 
         [Header("Input")]
         [Tooltip("Briefly ignores gameplay input after START so the trigger used on the experimenter UI cannot place a piece.")]
@@ -46,6 +48,10 @@ namespace VACExperiment.Tetris
         private float inputEnabledTime;
         private float sessionDurationSeconds;
         private bool isTrainingSession;
+        private float viewingDistanceWeightedTotal;
+        private float viewingDistanceSampleSeconds;
+        private float minViewingDistance;
+        private float maxViewingDistance;
 
         // Compatibility entry point for the old two-condition flow.
         public void BeginSession(VacCondition newCondition, TetrisSequenceId newSequence)
@@ -86,6 +92,9 @@ namespace VACExperiment.Tetris
             if (dataLogger == null)
                 dataLogger = FindAnyObjectByType<DataLogger>();
 
+            if (boardDistanceCalibration == null)
+                boardDistanceCalibration = FindAnyObjectByType<BoardDistanceCalibration>();
+
             SetVisualsVisible(true);
 
             sequenceId = newSequence;
@@ -95,6 +104,10 @@ namespace VACExperiment.Tetris
             piecesPlaced = 0;
             topOuts = 0;
             placementTimeTotal = 0f;
+            viewingDistanceWeightedTotal = 0f;
+            viewingDistanceSampleSeconds = 0f;
+            minViewingDistance = float.PositiveInfinity;
+            maxViewingDistance = 0f;
 
             board.ClearBoard();
             sessionDurationSeconds = Mathf.Max(1f, durationSeconds);
@@ -119,8 +132,29 @@ namespace VACExperiment.Tetris
                 0f,
                 sessionDurationSeconds - (Time.realtimeSinceStartup - sessionStartTime));
 
+            SampleViewingDistance();
+
             if (RemainingSeconds <= 0f)
                 EndSession();
+        }
+
+        private void SampleViewingDistance()
+        {
+            if (isTrainingSession ||
+                boardDistanceCalibration == null ||
+                !boardDistanceCalibration.IsBoardLocked)
+                return;
+
+            float distance = boardDistanceCalibration.ActualDistanceMeters;
+            float dt = Mathf.Max(0f, Time.unscaledDeltaTime);
+
+            if (distance <= 0f || dt <= 0f)
+                return;
+
+            viewingDistanceWeightedTotal += distance * dt;
+            viewingDistanceSampleSeconds += dt;
+            minViewingDistance = Mathf.Min(minViewingDistance, distance);
+            maxViewingDistance = Mathf.Max(maxViewingDistance, distance);
         }
 
         public void MoveLeft()
@@ -254,6 +288,19 @@ namespace VACExperiment.Tetris
                 }
                 else
                 {
+                    float? meanViewingDistance =
+                        viewingDistanceSampleSeconds > 0f
+                            ? viewingDistanceWeightedTotal / viewingDistanceSampleSeconds
+                            : (float?)null;
+                    float? minimumViewingDistance =
+                        viewingDistanceSampleSeconds > 0f
+                            ? minViewingDistance
+                            : (float?)null;
+                    float? maximumViewingDistance =
+                        viewingDistanceSampleSeconds > 0f
+                            ? maxViewingDistance
+                            : (float?)null;
+
                     dataLogger?.LogTetrisSummary(
                         vacLevel,
                         sequenceId,
@@ -262,7 +309,10 @@ namespace VACExperiment.Tetris
                         linesCleared,
                         piecesPlaced,
                         averagePlacementTime,
-                        topOuts);
+                        topOuts,
+                        meanViewingDistance,
+                        minimumViewingDistance,
+                        maximumViewingDistance);
                 }
             }
 
