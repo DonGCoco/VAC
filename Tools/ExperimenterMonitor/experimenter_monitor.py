@@ -14,7 +14,12 @@ START intentionally remains inside the headset for the participant.
 
 import argparse
 import json
+import os
+from pathlib import Path
+import shutil
 import socket
+import subprocess
+import sys
 import threading
 import time
 import webbrowser
@@ -27,11 +32,27 @@ HTTP_PORT = 8765
 DISCOVERY_INTERVAL_SECONDS = 0.75
 DISCOVERY_MESSAGE = f"VAC_MONITOR_DISCOVER:{STATUS_PORT}".encode("utf-8")
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+COLLECTED_DATA_ROOT = REPO_ROOT / "CollectedData"
+PACKAGE_ID = os.environ.get("VAC_PACKAGE_ID", "com.DefaultCompany.VAC")
+UNITY_ADB = Path(
+    "/Applications/Unity/Hub/Editor/6000.2.15f1/"
+    "PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb"
+)
+
 state_lock = threading.Lock()
 latest_status = {}
 headset_address = None
 last_seen = 0.0
 manual_headset_ip = None
+export_status = {
+    "session_id": "",
+    "state": "idle",
+    "message": "",
+    "path": "",
+    "validation": "",
+}
+last_export_attempt = {}
 
 PAGE = r"""<!doctype html>
 <html>
@@ -73,6 +94,7 @@ button:disabled { opacity: .35; }
   <div id="participant" style="margin-top:12px;">Participant —</div>
   <div id="assignment">Group / order —</div>
   <div id="logging" class="small" style="margin-top:6px;">Logging —</div>
+  <div id="export" class="small" style="margin-top:6px;">Data export —</div>
   <div class="row">
     <button id="c1" onclick="cmd('C1')">C1 · 0.80 m</button>
     <button id="c2" onclick="cmd('C2')">C2 · 1.00 m</button>
@@ -173,6 +195,20 @@ async function refresh() {
         d.logging_ready
           ? ('Logging · ' + (d.session_id || 'active'))
           : 'Logging —';
+      const exportInfo = s.export || {};
+      let exportText = 'Data export —';
+      if (exportInfo.session_id && exportInfo.session_id === d.session_id) {
+        if (exportInfo.state === 'running') {
+          exportText = 'Data export · COPYING TO COMPUTER…';
+        } else if (exportInfo.state === 'saved') {
+          exportText = 'Data export · SAVED';
+          if (exportInfo.validation)
+            exportText += ' · Validation ' + exportInfo.validation;
+        } else if (exportInfo.state === 'error') {
+          exportText = 'Data export · ERROR · ' + (exportInfo.message || 'unknown error');
+        }
+      }
+      document.getElementById('export').textContent = exportText;
       document.getElementById('phase').textContent =
         'FLOW · ' + String(d.phase || 'Idle');
       document.getElementById('block').textContent =
@@ -211,7 +247,16 @@ async function refresh() {
         flowLabel = remain > 0 ? 'RECOVERY — WAIT' : 'RECOVERY COMPLETE';
         if (d.recovery_ready) currentFlowCommand = 'RECOVERY_DONE';
       } else if (d.phase === 'Complete') {
-        flowInstruction = 'Experiment complete. Save/check the session data before the participant leaves.';
+        const exportInfo = s.export || {};
+        if (exportInfo.session_id === d.session_id && exportInfo.state === 'saved') {
+          flowInstruction = 'Experiment complete. Session data was automatically copied to the computer.';
+          if (exportInfo.validation)
+            flowInstruction += ' Validation: ' + exportInfo.validation + '.';
+        } else if (exportInfo.session_id === d.session_id && exportInfo.state === 'error') {
+          flowInstruction = 'Experiment complete, but automatic data export failed. Check the Data export status above.';
+        } else {
+          flowInstruction = 'Experiment complete. Copying session data to the computer automatically…';
+        }
         flowLabel = 'COMPLETE';
       } else {
         flowInstruction = 'Assign a participant to begin the formal flow.';
@@ -271,6 +316,153 @@ refresh();
 </html>
 """
 
+def _find_adb():
+    adb_on_path = shutil.which("adb")
+    if adb_on_path:
+        return adb_on_path
+
+    if UNITY_ADB.is_file():
+        return str(UNITY_ADB)
+
+    return None
+
+
+def _set_export_status(session_id, state, message="", path="", validation=""):
+    global export_status
+    with state_lock:
+        export_status = {
+            "session_id": session_id,
+            "state": state,
+            "message": message,
+            "path": path,
+            "validation": validation,
+        }
+
+
+def _export_session_worker(session_id):
+    # Give the synchronous Unity CSV writes a brief margin before adb pulls.
+    time.sleep(0.5)
+
+    adb = _find_adb()
+    if not adb:
+        _set_export_status(
+            session_id,
+            "error",
+            "adb not found on PATH or in the configured Unity Android SDK.",
+        )
+        return
+
+    remote_session = (
+        f"/sdcard/Android/data/{PACKAGE_ID}/files/"
+        f"VACExperimentData/{session_id}"
+    )
+    local_session = COLLECTED_DATA_ROOT / session_id
+
+    try:
+        COLLECTED_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+
+        state_check = subprocess.run(
+            [adb, "get-state"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if state_check.returncode != 0 or "device" not in state_check.stdout:
+            raise RuntimeError(
+                (state_check.stderr or state_check.stdout or "adb device not available").strip()
+            )
+
+        if local_session.exists():
+            shutil.rmtree(local_session)
+
+        pull = subprocess.run(
+            [adb, "pull", remote_session, str(local_session)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if pull.returncode != 0:
+            raise RuntimeError(
+                (pull.stderr or pull.stdout or "adb pull failed").strip()
+            )
+
+        if not (local_session / "session.csv").is_file():
+            raise RuntimeError(
+                f"pull completed but session.csv was not found in {local_session}"
+            )
+
+        validator = REPO_ROOT / "Tools" / "validate_vac_session.py"
+        validation = ""
+        message = "Session copied to computer."
+
+        if validator.is_file():
+            check = subprocess.run(
+                [sys.executable, str(validator), str(local_session)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            validation = "PASS" if check.returncode == 0 else "FAIL"
+            summary = (check.stdout or check.stderr or "").strip()
+            if summary:
+                message = summary[-1200:]
+
+        _set_export_status(
+            session_id,
+            "saved",
+            message,
+            str(local_session),
+            validation,
+        )
+        print(f"Auto-exported VAC session: {local_session}")
+        if validation:
+            print(f"Automatic validation: {validation}")
+
+    except Exception as exc:
+        _set_export_status(session_id, "error", str(exc))
+        print(f"Automatic VAC data export failed for {session_id}: {exc}")
+
+
+def maybe_start_auto_export(data):
+    if data.get("phase") != "Complete":
+        return
+
+    if not data.get("logging_ready"):
+        return
+
+    session_id = str(data.get("session_id") or "").strip()
+    if not session_id:
+        return
+
+    now = time.time()
+
+    with state_lock:
+        current_session = export_status.get("session_id", "")
+        current_state = export_status.get("state", "idle")
+
+        if current_session == session_id and current_state in {"running", "saved"}:
+            return
+
+        last_attempt = last_export_attempt.get(session_id, 0.0)
+        if current_session == session_id and current_state == "error" and now - last_attempt < 5.0:
+            return
+
+        last_export_attempt[session_id] = now
+        export_status.update({
+            "session_id": session_id,
+            "state": "running",
+            "message": "Copying session data from headset…",
+            "path": "",
+            "validation": "",
+        })
+
+    threading.Thread(
+        target=_export_session_worker,
+        args=(session_id,),
+        daemon=True,
+    ).start()
+
+
 def udp_receiver():
     global latest_status, headset_address, last_seen
 
@@ -289,6 +481,8 @@ def udp_receiver():
             latest_status = data
             headset_address = address[0]
             last_seen = time.time()
+
+        maybe_start_auto_export(data)
 
 def discovery_sender():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -340,7 +534,8 @@ class Handler(BaseHTTPRequestHandler):
                 body_obj = {
                     "connected": connected,
                     "headset_ip": headset_address,
-                    "data": latest_status if connected else None
+                    "data": latest_status if connected else None,
+                    "export": dict(export_status),
                 }
 
             body = json.dumps(body_obj).encode("utf-8")
@@ -410,6 +605,7 @@ def main():
     if manual_headset_ip:
         print(f"Fallback discovery target: {manual_headset_ip}")
     print("Headset and laptop must be on a network that allows local device communication.")
+    print(f"Completed sessions auto-export to: {COLLECTED_DATA_ROOT}")
     print("Press Ctrl+C to stop.")
 
     threading.Timer(0.5, lambda: webbrowser.open(url)).start()
