@@ -134,8 +134,8 @@ namespace VACExperiment
 
             if (Phase == FormalExperimentPhase.WarmupCalibration)
             {
-                SetPhase(FormalExperimentPhase.WarmupTetris, "WarmupStarted", VacLevel.C2);
-                tetrisManager.BeginTrainingSession(VacLevel.C2);
+                SetPhase(FormalExperimentPhase.WarmupTetris, "WarmupStarted", config != null ? config.warmupCondition : VacLevel.C2);
+                tetrisManager.BeginTrainingSession(config != null ? config.warmupCondition : VacLevel.C2);
                 return;
             }
 
@@ -217,11 +217,11 @@ namespace VACExperiment
 
         private void PrepareWarmupCalibration()
         {
-            calibration.SelectCondition(VacLevel.C2);
+            calibration.SelectCondition(config != null ? config.warmupCondition : VacLevel.C2);
             SetPhase(
                 FormalExperimentPhase.WarmupCalibration,
                 "WarmupCalibrationReady",
-                VacLevel.C2);
+                config != null ? config.warmupCondition : VacLevel.C2);
         }
 
         private void PrepareCurrentBlockCalibration()
@@ -252,8 +252,8 @@ namespace VACExperiment
                 SetPhase(
                     FormalExperimentPhase.WarmupDepthPractice,
                     "WarmupDepthPracticeStarted",
-                    VacLevel.C2);
-                depthJudgmentManager.BeginPractice(VacLevel.C2);
+                    config != null ? config.warmupCondition : VacLevel.C2);
+                depthJudgmentManager.BeginPractice(config != null ? config.warmupCondition : VacLevel.C2);
                 return;
             }
 
