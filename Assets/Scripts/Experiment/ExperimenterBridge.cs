@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using UnityEngine;
 using VACExperiment.Board;
 using VACExperiment.Tetris;
@@ -20,6 +22,15 @@ namespace VACExperiment
     public class ExperimenterBridge : MonoBehaviour
     {
         private const string DiscoveryPrefix = "VAC_MONITOR_DISCOVER";
+        private const string SessionTransferMagic = "VAC_SESSION_V1";
+        private static readonly string[] SessionTransferFiles =
+        {
+            "session.csv",
+            "events.csv",
+            "blocks.csv",
+            "tetris.csv",
+            "depth_trials.csv"
+        };
 
         [Header("References")]
         [SerializeField] private BoardDistanceCalibration calibration;
@@ -32,6 +43,7 @@ namespace VACExperiment
         [Header("Network")]
         [SerializeField, Range(1024, 65535)] private int statusPort = 45555;
         [SerializeField, Range(1024, 65535)] private int commandPort = 45556;
+        [SerializeField, Range(1024, 65535)] private int dataTransferPort = 45557;
         [SerializeField, Min(0.05f)] private float statusIntervalSeconds = 0.10f;
 
         private UdpClient statusSender;
@@ -39,6 +51,13 @@ namespace VACExperiment
         private IPEndPoint statusEndpoint;
         private float nextStatusTime;
         private bool initialized;
+
+        private volatile bool dataTransferInProgress;
+        private string transferredSessionId = "";
+        private string transferState = "Idle";
+        private string transferMessage = "";
+        private DateTime nextTransferAttemptUtc = DateTime.MinValue;
+        private readonly object transferLock = new();
 
         [Serializable]
         private class ExperimenterStatus
@@ -64,6 +83,8 @@ namespace VACExperiment
             public bool development_shortcuts;
             public bool logging_ready;
             public string session_id;
+            public string data_transfer_state;
+            public string data_transfer_message;
         }
 
         private void Start()
@@ -131,6 +152,7 @@ namespace VACExperiment
                 return;
 
             ReceiveCommands();
+            TryStartCompletedSessionTransfer();
 
             if (statusEndpoint != null && Time.unscaledTime >= nextStatusTime)
             {
@@ -182,7 +204,9 @@ namespace VACExperiment
                 development_shortcuts =
                     formalFlow != null && formalFlow.DevelopmentShortcutsAvailable,
                 logging_ready = dataLogger != null && dataLogger.HasSession,
-                session_id = dataLogger != null ? dataLogger.SessionId : ""
+                session_id = dataLogger != null ? dataLogger.SessionId : "",
+                data_transfer_state = GetTransferState(),
+                data_transfer_message = GetTransferMessage()
             };
 
             string json = JsonUtility.ToJson(status);
@@ -197,6 +221,175 @@ namespace VACExperiment
                 Debug.LogWarning(
                     $"ExperimenterBridge status send failed: {exception.SocketErrorCode}");
             }
+        }
+
+        private string GetTransferState()
+        {
+            lock (transferLock)
+                return transferState;
+        }
+
+        private string GetTransferMessage()
+        {
+            lock (transferLock)
+                return transferMessage;
+        }
+
+        private void SetTransferStatus(string state, string message)
+        {
+            lock (transferLock)
+            {
+                transferState = state;
+                transferMessage = message ?? "";
+            }
+        }
+
+        private void TryStartCompletedSessionTransfer()
+        {
+            if (formalFlow == null ||
+                formalFlow.Phase != FormalExperimentPhase.Complete ||
+                dataLogger == null ||
+                !dataLogger.HasSession ||
+                statusEndpoint == null ||
+                dataTransferInProgress)
+                return;
+
+            string sessionId = dataLogger.SessionId;
+            if (string.IsNullOrWhiteSpace(sessionId) ||
+                string.Equals(transferredSessionId, sessionId, StringComparison.Ordinal))
+                return;
+
+            if (DateTime.UtcNow < nextTransferAttemptUtc)
+                return;
+
+            string sessionFolder = dataLogger.SessionFolder;
+            string monitorIp = statusEndpoint.Address.ToString();
+            int port = dataTransferPort;
+
+            dataTransferInProgress = true;
+            SetTransferStatus("Sending", "Sending completed session to experimenter computer over local network.");
+
+            Thread thread = new(() =>
+                TransferSessionToMonitor(sessionId, sessionFolder, monitorIp, port))
+            {
+                IsBackground = true,
+                Name = "VAC Session Transfer"
+            };
+            thread.Start();
+        }
+
+        private void TransferSessionToMonitor(
+            string sessionId,
+            string sessionFolder,
+            string monitorIp,
+            int port)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(sessionFolder) ||
+                    !Directory.Exists(sessionFolder))
+                {
+                    throw new DirectoryNotFoundException(
+                        $"Session folder not found: {sessionFolder}");
+                }
+
+                using TcpClient client = new();
+                IAsyncResult connectResult = client.BeginConnect(monitorIp, port, null, null);
+                if (!connectResult.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(5)))
+                {
+                    client.Close();
+                    throw new TimeoutException(
+                        $"Timed out connecting to experimenter computer at {monitorIp}:{port}.");
+                }
+
+                client.EndConnect(connectResult);
+                client.NoDelay = true;
+
+                using NetworkStream stream = client.GetStream();
+                stream.ReadTimeout = 15000;
+                stream.WriteTimeout = 15000;
+
+                WriteTransferLine(stream, SessionTransferMagic);
+                WriteTransferLine(stream, sessionId);
+                WriteTransferLine(
+                    stream,
+                    SessionTransferFiles.Length.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture));
+
+                foreach (string fileName in SessionTransferFiles)
+                {
+                    string filePath = Path.Combine(sessionFolder, fileName);
+                    if (!File.Exists(filePath))
+                        throw new FileNotFoundException(
+                            $"Required session file is missing: {fileName}",
+                            filePath);
+
+                    FileInfo info = new(filePath);
+                    WriteTransferLine(stream, fileName);
+                    WriteTransferLine(
+                        stream,
+                        info.Length.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture));
+
+                    using FileStream input = File.OpenRead(filePath);
+                    input.CopyTo(stream);
+                }
+
+                WriteTransferLine(stream, "END");
+                stream.Flush();
+
+                string acknowledgement = ReadTransferLine(stream);
+                if (string.IsNullOrWhiteSpace(acknowledgement) ||
+                    !acknowledgement.StartsWith("ACK", StringComparison.Ordinal))
+                {
+                    throw new IOException(
+                        $"Experimenter computer did not acknowledge session transfer: '{acknowledgement}'.");
+                }
+
+                transferredSessionId = sessionId;
+                SetTransferStatus("Sent", acknowledgement);
+                Debug.Log(
+                    $"M7 session transferred over local network: {sessionId} -> {monitorIp}:{port}.");
+            }
+            catch (Exception exception)
+            {
+                nextTransferAttemptUtc = DateTime.UtcNow.AddSeconds(5);
+                SetTransferStatus("Error", exception.Message);
+                Debug.LogWarning(
+                    $"M7 wireless session transfer failed; retrying automatically: {exception.Message}");
+            }
+            finally
+            {
+                dataTransferInProgress = false;
+            }
+        }
+
+        private static void WriteTransferLine(Stream stream, string value)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes((value ?? "") + "\n");
+            stream.Write(bytes, 0, bytes.Length);
+        }
+
+        private static string ReadTransferLine(Stream stream)
+        {
+            using MemoryStream buffer = new();
+            while (true)
+            {
+                int value = stream.ReadByte();
+                if (value < 0)
+                    break;
+
+                if (value == '\n')
+                    break;
+
+                if (value != '\r')
+                    buffer.WriteByte((byte)value);
+
+                if (buffer.Length > 4096)
+                    throw new IOException("Transfer acknowledgement line is too long.");
+            }
+
+            return Encoding.UTF8.GetString(buffer.ToArray());
         }
 
         private void ReceiveCommands()
