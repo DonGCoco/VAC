@@ -88,7 +88,9 @@ It is only available when Unity reports a development/debug build (or in the Edi
 
 ## Current validation status
 
-Validated on Magic Leap 2 through the first Recovery checkpoint:
+M6 has now been validated end-to-end on Magic Leap 2.
+
+Confirmed on-device:
 
 - participant assignment and automatic G1/G2/G3 order
 - warm-up calibration
@@ -99,12 +101,12 @@ Validated on Magic Leap 2 through the first Recovery checkpoint:
 - formal Tetris A
 - formal depth judgement
 - Post-SSQ + QoE checkpoint
-- entry into Recovery and the 300 s minimum gate/countdown
+- Recovery entry, countdown and completion
+- automatic progression to Block 2
+- Block 2 condition selection + Tetris sequence B
+- second Recovery progression to Block 3
+- Block 3 condition selection + Tetris sequence C
+- final Post-SSQ + QoE checkpoint
+- transition to Complete
 
-Still requiring one fast end-to-end device validation:
-
-- Recovery -> Block 2 automatic progression
-- Block 2 condition + sequence B
-- second Recovery -> Block 3 automatic progression
-- Block 3 condition + sequence C
-- final Post-SSQ + QoE -> Complete
+M6 is therefore considered device-validated. The next milestone is M7: complete logging, dry-run checks, and formal-study readiness.
