@@ -137,4 +137,9 @@ Recommended next device validation:
 12. Confirm the monitor shows `Data export · SAVED · Validation PASS`.
 13. Open `CollectedData/<session_id>/` and verify the five CSV files are present.
 
-M7 is not considered device-validated until the auto-exported session returns `Validation PASS`.
+## Device validation status
+
+**PASS — 2026-10-14**
+
+Validated on Magic Leap 2 with session `P002_20261014_133856805` using hotspot-only transfer (USB/adb not required during the run). The completed session was received automatically by the experimenter computer and `Tools/validate_vac_session.py` returned `PASS`.
+
