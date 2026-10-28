@@ -19,7 +19,7 @@ namespace VACExperiment
 
         [Header("In-plane placement")]
         [Tooltip("Configurable X/Y offset on the registered board plane. No Z offset is permitted.")]
-        [SerializeField] private Vector2 stimulusOffsetMeters = Vector2.zero;
+        [SerializeField] private Vector2 stimulusOffsetMeters = new(0f, -0.40f);
 
         [Tooltip("Optional rotation within the registered board plane.")]
         [SerializeField] private float stimulusInPlaneRotationDegrees = 0f;
@@ -30,6 +30,8 @@ namespace VACExperiment
         public float FocalDiopters { get; private set; }
         public float VergenceDiopters { get; private set; }
         public float VacDiopters { get; private set; }
+
+        public Transform StimulusRoot => stimulusRoot;
 
         private Vector3 referenceLocalScale;
         private bool referenceScaleCached;

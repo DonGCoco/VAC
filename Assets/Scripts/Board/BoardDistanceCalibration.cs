@@ -48,6 +48,11 @@ namespace VACExperiment.Board
         public bool IsBoardLocked => boardRegistration != null && boardRegistration.IsPoseLocked;
         public float LockedDistanceMeters { get; private set; }
 
+        // These remain tracking-derived estimates, not independent physical truth.
+        public float PlaneDistanceMeters { get; private set; }
+        public float StimulusCenterDistanceMeters { get; private set; }
+        private float nextGeometryDiagnosticTime;
+
         private TextMesh conditionText;
         private TextMesh actualValueText;
         private GameObject actualWaitingObject;
@@ -140,6 +145,7 @@ namespace VACExperiment.Board
 
         public void LockBoardPose()
         {
+            RefreshMeasurement();
             if (CurrentState != BoardDistanceState.Ready)
             {
                 Debug.LogWarning(
@@ -212,6 +218,7 @@ namespace VACExperiment.Board
 
         private void RefreshMeasurement()
         {
+            RefreshGeometryDiagnostics();
             if (boardRegistration.IsPoseLocked)
             {
                 // Keep live head-to-board distance even after the board is anchored.
@@ -244,6 +251,33 @@ namespace VACExperiment.Board
                 CurrentState = BoardDistanceState.TooClose;
             else
                 CurrentState = BoardDistanceState.TooFar;
+        }
+
+        private void RefreshGeometryDiagnostics()
+        {
+            PlaneDistanceMeters = float.NaN;
+            StimulusCenterDistanceMeters = float.NaN;
+            if (boardRegistration == null || boardAnchor == null || viewer == null ||
+                !boardRegistration.HasRegisteredBoard)
+                return;
+
+            Vector3 eyeToAnchor = boardAnchor.position - viewer.position;
+            PlaneDistanceMeters = Mathf.Abs(Vector3.Dot(eyeToAnchor, boardAnchor.forward));
+            Transform stimulus = conditionController != null ? conditionController.StimulusRoot : null;
+            if (stimulus != null)
+                StimulusCenterDistanceMeters = Vector3.Distance(viewer.position, stimulus.position);
+
+            if (Time.unscaledTime < nextGeometryDiagnosticTime)
+                return;
+            nextGeometryDiagnosticTime = Time.unscaledTime + 1f;
+            Debug.Log(
+                $"VAC geometry (tracking estimates, not ruler truth): " +
+                $"eyeToAnchor={eyeToAnchor.magnitude:F4} m; " +
+                $"eyeToPlaneNormal={PlaneDistanceMeters:F4} m; " +
+                $"eyeToStimulusCenter={StimulusCenterDistanceMeters:F4} m; " +
+                $"anchorScale={boardAnchor.lossyScale}; " +
+                $"stimulusScale={(stimulus != null ? stimulus.lossyScale.ToString() : "missing")}; " +
+                $"condition={CurrentCondition}; locked={IsBoardLocked}.");
         }
 
         private void CreateRuntimePanel()

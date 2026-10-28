@@ -381,7 +381,7 @@ MonoBehaviour:
   config: {fileID: 11400000, guid: f17c9c148bae4df1bf2e6b717885b6cc, type: 2}
   boardRegistration: {fileID: 1700000003}
   stimulusRoot: {fileID: 1700000021}
-  stimulusOffsetMeters: {x: 0, y: 0}
+  stimulusOffsetMeters: {x: 0, y: -0.4}
   stimulusInPlaneRotationDegrees: 0
 --- !u!114 &1800000005
 MonoBehaviour:
