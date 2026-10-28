@@ -16,6 +16,7 @@ namespace VACExperiment.Tetris
 
         private Transform[,] grid;
         private Transform frameRoot;
+        private Mesh planarMesh;
 
         public int Width => width;
         public int Height => height;
@@ -70,7 +71,7 @@ namespace VACExperiment.Tetris
             }
             else
             {
-                GameObject fallback = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                GameObject fallback = CreatePlanarVisual();
                 fallback.name = "TetrisBlock";
 
                 Collider collider = fallback.GetComponent<Collider>();
@@ -84,7 +85,7 @@ namespace VACExperiment.Tetris
             block.localScale = new Vector3(
                 cellSize * 0.92f,
                 cellSize * 0.92f,
-                blockThicknessMeters);
+                blockPrefab != null ? blockThicknessMeters : 1f);
 
             return block;
         }
@@ -155,27 +156,27 @@ namespace VACExperiment.Tetris
             CreateFrameBar(
                 "FrameLeft",
                 new Vector3(-halfWidth - frameBarWidthMeters * 0.5f, 0f, 0f),
-                new Vector3(frameBarWidthMeters, boardHeight + frameBarWidthMeters * 2f, blockThicknessMeters));
+                new Vector3(frameBarWidthMeters, boardHeight + frameBarWidthMeters * 2f, 1f));
 
             CreateFrameBar(
                 "FrameRight",
                 new Vector3(halfWidth + frameBarWidthMeters * 0.5f, 0f, 0f),
-                new Vector3(frameBarWidthMeters, boardHeight + frameBarWidthMeters * 2f, blockThicknessMeters));
+                new Vector3(frameBarWidthMeters, boardHeight + frameBarWidthMeters * 2f, 1f));
 
             CreateFrameBar(
                 "FrameBottom",
                 new Vector3(0f, -halfHeight - frameBarWidthMeters * 0.5f, 0f),
-                new Vector3(boardWidth, frameBarWidthMeters, blockThicknessMeters));
+                new Vector3(boardWidth, frameBarWidthMeters, 1f));
 
             CreateFrameBar(
                 "FrameTop",
                 new Vector3(0f, halfHeight + frameBarWidthMeters * 0.5f, 0f),
-                new Vector3(boardWidth, frameBarWidthMeters, blockThicknessMeters));
+                new Vector3(boardWidth, frameBarWidthMeters, 1f));
         }
 
         private void CreateFrameBar(string name, Vector3 localPosition, Vector3 localScale)
         {
-            GameObject bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            GameObject bar = CreatePlanarVisual();
             bar.name = name;
 
             Collider collider = bar.GetComponent<Collider>();
@@ -186,6 +187,40 @@ namespace VACExperiment.Tetris
             bar.transform.localPosition = localPosition;
             bar.transform.localRotation = Quaternion.identity;
             bar.transform.localScale = localScale;
+        }
+
+        // Both sides share the same geometric plane. Duplicated vertices keep
+        // opposite normals separate; no front/back thickness or Z offset remains.
+        private GameObject CreatePlanarVisual()
+        {
+            if (planarMesh == null)
+            {
+                planarMesh = new Mesh { name = "VAC_CoplanarDoubleSidedQuad" };
+                Vector3 a = new(-0.5f, -0.5f, 0f);
+                Vector3 b = new(0.5f, -0.5f, 0f);
+                Vector3 c = new(0.5f, 0.5f, 0f);
+                Vector3 d = new(-0.5f, 0.5f, 0f);
+                planarMesh.vertices = new[] { a, b, c, d, a, b, c, d };
+                planarMesh.uv = new[]
+                {
+                    Vector2.zero, Vector2.right, Vector2.one, Vector2.up,
+                    Vector2.zero, Vector2.right, Vector2.one, Vector2.up
+                };
+                planarMesh.triangles = new[] { 0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7 };
+                planarMesh.RecalculateNormals();
+                planarMesh.RecalculateBounds();
+            }
+
+            // Retain Unity's default primitive material, matching existing visuals.
+            GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            visual.GetComponent<MeshFilter>().sharedMesh = planarMesh;
+            return visual;
+        }
+
+        private void OnDestroy()
+        {
+            if (planarMesh != null)
+                Destroy(planarMesh);
         }
 
         private int ClearCompletedLines()
