@@ -6,10 +6,17 @@ namespace VACExperiment.Tetris
     {
         [SerializeField, Min(4)] private int width = 10;
         [SerializeField, Min(8)] private int height = 20;
-        [SerializeField, Min(0.001f)] private float cellSize = 0.04f;
+        [SerializeField, Min(0.001f)] private float cellSize = 0.02f;
+        [SerializeField, Min(0.0005f)] private float blockThicknessMeters = 0.002f;
         [SerializeField] private Transform blockPrefab;
 
+        [Header("Board frame")]
+        [SerializeField] private bool showBoardFrame = true;
+        [SerializeField, Min(0.0005f)] private float frameBarWidthMeters = 0.002f;
+
         private Transform[,] grid;
+        private Transform frameRoot;
+        private Mesh planarMesh;
 
         public int Width => width;
         public int Height => height;
@@ -18,6 +25,9 @@ namespace VACExperiment.Tetris
         private void Awake()
         {
             grid = new Transform[width, height];
+
+            if (showBoardFrame)
+                CreateBoardFrame();
         }
 
         public Vector2Int SpawnPosition => new(width / 2 - 1, height - 2);
@@ -31,7 +41,6 @@ namespace VACExperiment.Tetris
                 if (p.x < 0 || p.x >= width || p.y < 0)
                     return false;
 
-                // Cells above the board are allowed while spawning.
                 if (p.y >= height)
                     continue;
 
@@ -62,13 +71,22 @@ namespace VACExperiment.Tetris
             }
             else
             {
-                GameObject fallback = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                GameObject fallback = CreatePlanarVisual();
                 fallback.name = "TetrisBlock";
+
+                Collider collider = fallback.GetComponent<Collider>();
+                if (collider != null)
+                    Destroy(collider);
+
                 block = fallback.transform;
                 block.SetParent(parent, false);
             }
 
-            block.localScale = Vector3.one * (cellSize * 0.92f);
+            block.localScale = new Vector3(
+                cellSize * 0.92f,
+                cellSize * 0.92f,
+                blockPrefab != null ? blockThicknessMeters : 1f);
+
             return block;
         }
 
@@ -118,6 +136,91 @@ namespace VACExperiment.Tetris
                     grid[x, y] = null;
                 }
             }
+        }
+
+        private void CreateBoardFrame()
+        {
+            if (frameRoot != null)
+                return;
+
+            GameObject root = new("BoardFrame");
+            frameRoot = root.transform;
+            frameRoot.SetParent(transform, false);
+            frameRoot.localPosition = Vector3.zero;
+
+            float boardWidth = width * cellSize;
+            float boardHeight = height * cellSize;
+            float halfWidth = boardWidth * 0.5f;
+            float halfHeight = boardHeight * 0.5f;
+
+            CreateFrameBar(
+                "FrameLeft",
+                new Vector3(-halfWidth - frameBarWidthMeters * 0.5f, 0f, 0f),
+                new Vector3(frameBarWidthMeters, boardHeight + frameBarWidthMeters * 2f, 1f));
+
+            CreateFrameBar(
+                "FrameRight",
+                new Vector3(halfWidth + frameBarWidthMeters * 0.5f, 0f, 0f),
+                new Vector3(frameBarWidthMeters, boardHeight + frameBarWidthMeters * 2f, 1f));
+
+            CreateFrameBar(
+                "FrameBottom",
+                new Vector3(0f, -halfHeight - frameBarWidthMeters * 0.5f, 0f),
+                new Vector3(boardWidth, frameBarWidthMeters, 1f));
+
+            CreateFrameBar(
+                "FrameTop",
+                new Vector3(0f, halfHeight + frameBarWidthMeters * 0.5f, 0f),
+                new Vector3(boardWidth, frameBarWidthMeters, 1f));
+        }
+
+        private void CreateFrameBar(string name, Vector3 localPosition, Vector3 localScale)
+        {
+            GameObject bar = CreatePlanarVisual();
+            bar.name = name;
+
+            Collider collider = bar.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+
+            bar.transform.SetParent(frameRoot, false);
+            bar.transform.localPosition = localPosition;
+            bar.transform.localRotation = Quaternion.identity;
+            bar.transform.localScale = localScale;
+        }
+
+        // Both sides share the same geometric plane. Duplicated vertices keep
+        // opposite normals separate; no front/back thickness or Z offset remains.
+        private GameObject CreatePlanarVisual()
+        {
+            if (planarMesh == null)
+            {
+                planarMesh = new Mesh { name = "VAC_CoplanarDoubleSidedQuad" };
+                Vector3 a = new(-0.5f, -0.5f, 0f);
+                Vector3 b = new(0.5f, -0.5f, 0f);
+                Vector3 c = new(0.5f, 0.5f, 0f);
+                Vector3 d = new(-0.5f, 0.5f, 0f);
+                planarMesh.vertices = new[] { a, b, c, d, a, b, c, d };
+                planarMesh.uv = new[]
+                {
+                    Vector2.zero, Vector2.right, Vector2.one, Vector2.up,
+                    Vector2.zero, Vector2.right, Vector2.one, Vector2.up
+                };
+                planarMesh.triangles = new[] { 0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7 };
+                planarMesh.RecalculateNormals();
+                planarMesh.RecalculateBounds();
+            }
+
+            // Retain Unity's default primitive material, matching existing visuals.
+            GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            visual.GetComponent<MeshFilter>().sharedMesh = planarMesh;
+            return visual;
+        }
+
+        private void OnDestroy()
+        {
+            if (planarMesh != null)
+                Destroy(planarMesh);
         }
 
         private int ClearCompletedLines()
