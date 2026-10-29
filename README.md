@@ -1,6 +1,6 @@
 # VAC — Magic Leap 2 Experiment Framework
 
-Group 5 experimental codebase for a within-subject study of vergence–accommodation conflict (VAC) using Magic Leap 2.
+Group 5 experimental codebase for a within-subject study of vergence–accommodation conflict (VAC) using Magic Leap 2. 
 
 ## Current status
 
