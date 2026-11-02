@@ -43,7 +43,8 @@ def main():
     assert "blockPrefab: {fileID: 0}" in scene
     lock = calibration.split("public void LockBoardPose()", 1)[1].split("public void RescanBoard", 1)[0]
     assert lock.index("RefreshMeasurement();") < lock.index("CurrentState != BoardDistanceState.Ready")
-    assert "ActualDistanceMeters = Vector3.Distance(viewer.position, boardAnchor.position)" in calibration
+    assert "ActualDistanceMeters = StimulusCenterDistanceMeters" in calibration
+    assert "ActualDistanceMeters = Vector3.Distance(viewer.position, boardAnchor.position)" not in calibration
     assert "Mathf.Abs(Vector3.Dot(eyeToAnchor, boardAnchor.forward))" in calibration
     # Derive the numerical mesh check from the implementation's actual arrays.
     points = dict((name, tuple(float(x.rstrip('f')) for x in values.split(',')))
@@ -62,7 +63,7 @@ def main():
     gap = .4 - (20 * .02 / 2 + .002) * 1.5 - .12 / 2
     assert math.isclose(gap, .037)
     print("PASS: 14 code/asset candidate values; fixed 12 cm QR; scene placement;")
-    print("      LOCK remeasurement; preserved Actual definition; double-sided Z=0 mesh.")
+    print("      LOCK remeasurement; game-centre Actual definition; double-sided Z=0 mesh.")
     print(f"Default maximum-scale QR-pattern clearance: {gap*1000:.1f} mm (excludes white border).")
     for d in (.8, 1, 1.5):
         print(f"QR-normal example: plane/anchor={d:.2f} m, stimulus={math.hypot(d,.4):.4f} m")

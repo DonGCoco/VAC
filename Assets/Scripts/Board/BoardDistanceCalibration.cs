@@ -17,7 +17,7 @@ namespace VACExperiment.Board
 
     /// <summary>
     /// Milestone 2 physical-board distance calibration.
-    /// Measures the cyclopean-view approximation (Main Camera) to BoardAnchor distance,
+    /// Measures the cyclopean-view approximation (Main Camera) to the game centre,
     /// compares it with the selected C1/C2/C3 target, and exposes a minimal XRI-selectable
     /// in-headset calibration panel.
     /// </summary>
@@ -44,6 +44,8 @@ namespace VACExperiment.Board
         public BoardDistanceState CurrentState { get; private set; } = BoardDistanceState.WaitingForMarker;
         public float TargetDistanceMeters { get; private set; }
         public float ActualDistanceMeters { get; private set; }
+        public bool HasValidViewingDistance => ActualDistanceMeters > 0f &&
+            !float.IsNaN(ActualDistanceMeters) && !float.IsInfinity(ActualDistanceMeters);
         public bool IsReady => CurrentState == BoardDistanceState.Ready;
         public bool IsBoardLocked => boardRegistration != null && boardRegistration.IsPoseLocked;
         public float LockedDistanceMeters { get; private set; }
@@ -104,6 +106,13 @@ namespace VACExperiment.Board
                 tetrisManager = FindAnyObjectByType<TetrisManager>();
 
             conditionController?.ApplyCondition(CurrentCondition);
+
+            if (conditionController == null || conditionController.StimulusRoot == null)
+            {
+                Debug.LogError("Game-centre calibration requires ConditionController and StimulusRoot.");
+                enabled = false;
+                return;
+            }
 
             if (tetrisManager != null)
                 tetrisManager.onSessionCompleted.AddListener(ShowExperimenterPanel);
@@ -182,6 +191,7 @@ namespace VACExperiment.Board
 
         public void StartTetrisTest()
         {
+            RefreshMeasurement();
             if (tetrisManager == null)
             {
                 Debug.LogError("M4 START requires a TetrisManager.");
@@ -219,11 +229,9 @@ namespace VACExperiment.Board
         private void RefreshMeasurement()
         {
             RefreshGeometryDiagnostics();
+            ActualDistanceMeters = 0f;
             if (boardRegistration.IsPoseLocked)
             {
-                // Keep live head-to-board distance even after the board is anchored.
-                ActualDistanceMeters = Vector3.Distance(viewer.position, boardAnchor.position);
-
                 if (boardRegistration.HasSpatialAnchorLockFailed)
                     CurrentState = BoardDistanceState.AnchorError;
                 else
@@ -231,6 +239,9 @@ namespace VACExperiment.Board
                         ? BoardDistanceState.Locked
                         : BoardDistanceState.Locking;
 
+                // Do not show or log a stale distance while the spatial anchor is untracked.
+                if (CurrentState == BoardDistanceState.Locked)
+                    ApplyStimulusCenterMeasurement();
                 return;
             }
 
@@ -241,7 +252,8 @@ namespace VACExperiment.Board
                 return;
             }
 
-            ActualDistanceMeters = Vector3.Distance(viewer.position, boardAnchor.position);
+            if (!ApplyStimulusCenterMeasurement())
+                return;
             float delta = ActualDistanceMeters - TargetDistanceMeters;
             float tolerance = config.boardDistanceToleranceMeters;
 
@@ -251,6 +263,22 @@ namespace VACExperiment.Board
                 CurrentState = BoardDistanceState.TooClose;
             else
                 CurrentState = BoardDistanceState.TooFar;
+        }
+
+        private bool ApplyStimulusCenterMeasurement()
+        {
+            if (float.IsNaN(StimulusCenterDistanceMeters) ||
+                float.IsInfinity(StimulusCenterDistanceMeters) ||
+                StimulusCenterDistanceMeters <= 0f)
+            {
+                CurrentState = BoardDistanceState.AnchorError;
+                return false;
+            }
+
+            // StimulusRoot is the centre of the symmetric Tetris grid and frame.
+            // Measure its world position directly, including offset and board rotation.
+            ActualDistanceMeters = StimulusCenterDistanceMeters;
+            return true;
         }
 
         private void RefreshGeometryDiagnostics()
@@ -312,7 +340,7 @@ namespace VACExperiment.Board
                 new Vector3(0f, 0.030f, 0f),
                 0.0026f,
                 40,
-                "Actual --").gameObject;
+                "Game distance --").gameObject;
 
             actualValueText = CreateText(
                 panel.transform,
@@ -320,7 +348,7 @@ namespace VACExperiment.Board
                 new Vector3(0f, 0.030f, 0f),
                 0.0026f,
                 40,
-                "Actual 0.000 m");
+                "Game distance 0.000 m");
             actualValueObject = actualValueText.gameObject;
 
             waitingStateObject = CreateText(
@@ -459,12 +487,12 @@ namespace VACExperiment.Board
             conditionText.text =
                 $"{CurrentCondition}   Target {TargetDistanceMeters:F2} m";
 
-            bool waiting = CurrentState == BoardDistanceState.WaitingForMarker;
+            bool waiting = !HasValidViewingDistance;
             actualWaitingObject.SetActive(waiting);
             actualValueObject.SetActive(!waiting);
 
             if (!waiting)
-                actualValueText.text = $"Actual {ActualDistanceMeters:F3} m";
+                actualValueText.text = $"Game distance {ActualDistanceMeters:F3} m";
 
             waitingStateObject.SetActive(CurrentState == BoardDistanceState.WaitingForMarker);
             tooCloseStateObject.SetActive(CurrentState == BoardDistanceState.TooClose);

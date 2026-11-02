@@ -6,9 +6,11 @@ namespace VACExperiment
     /// <summary>
     /// Milestone 3 condition geometry.
     ///
-    /// BoardAnchor defines stimulus depth. This controller never places content
+    /// BoardAnchor registers the plane; StimulusRoot defines the game centre.
+    /// Condition distances refer to Main Camera to game centre, not the QR anchor.
+    /// This controller never places content
     /// relative to the current head pose. It keeps the stimulus co-planar with
-    /// BoardAnchor and applies constant-visual-angle scaling once per condition.
+    /// BoardAnchor and applies nominal visual-angle scaling once per condition.
     /// </summary>
     public class ConditionController : MonoBehaviour
     {

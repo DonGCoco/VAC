@@ -118,7 +118,7 @@ button:disabled { opacity: .35; }
 
 <div class="card">
   <div id="condition">Condition —</div>
-  <div class="actual" id="actual">Actual —</div>
+  <div class="actual" id="actual">Game distance —</div>
   <div id="target">Target —</div>
   <div class="state" id="state">WAITING</div>
   <div id="instruction">Searching for the Magic Leap 2 on the local network.</div>
@@ -278,7 +278,8 @@ async function refresh() {
       devSkip.style.display = showDevSkip ? 'inline-block' : 'none';
 
       document.getElementById('condition').textContent = 'Condition ' + d.condition;
-      document.getElementById('actual').textContent = 'Actual ' + metres(d.actual_m);
+      document.getElementById('actual').textContent =
+        'Game distance ' + (Number(d.actual_m) > 0 ? metres(d.actual_m) : '—');
       document.getElementById('target').textContent = 'Target ' + metres(d.target_m);
       document.getElementById('state').textContent = String(d.state || '—').toUpperCase();
 

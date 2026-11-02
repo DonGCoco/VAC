@@ -142,7 +142,8 @@ namespace VACExperiment.Tetris
         {
             if (isTrainingSession ||
                 boardDistanceCalibration == null ||
-                !boardDistanceCalibration.IsBoardLocked)
+                !boardDistanceCalibration.IsBoardLocked ||
+                !boardDistanceCalibration.HasValidViewingDistance)
                 return;
 
             float distance = boardDistanceCalibration.ActualDistanceMeters;

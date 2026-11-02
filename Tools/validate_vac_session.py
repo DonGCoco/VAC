@@ -62,6 +62,10 @@ def main():
     formal_trials = as_int(session.get("formal_depth_trials")) or 0
     tolerance = as_float(session.get("board_tolerance_m"))
 
+    if session.get("protocol_version") == "M7-game-center":
+        if session.get("viewing_distance_reference") != "main_camera_to_game_center":
+            errors.append("game-centre session has a missing or inconsistent distance reference")
+
     if not participant:
         errors.append("participant_id is missing in session.csv")
     if expected_order is None:
