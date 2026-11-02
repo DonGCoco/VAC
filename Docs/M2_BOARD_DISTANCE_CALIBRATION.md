@@ -1,3 +1,7 @@
+> Current distance definition: [Game-centre viewing distance](GAME_CENTER_DISTANCE.md).
+> `Actual`, READY, LOCK and new session distance logs use Main Camera to game centre.
+> Older M7 exports use the previous anchor reference.
+
 # Milestone 2 — Board Distance Calibration
 
 ## Scope

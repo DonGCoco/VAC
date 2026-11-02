@@ -359,7 +359,7 @@ namespace VACExperiment
         {
             EnsureHeader(
                 sessionPath,
-                "session_id,participant_id,group,condition_order,started_utc,protocol_version,app_version,unity_version,device_model,operating_system,development_build,focal_distance_m,c1_distance_m,c2_distance_m,c3_distance_m,board_tolerance_m,tetris_duration_s,warmup_condition,warmup_tetris_duration_s,minimum_recovery_s,depth_reference_m,depth_difference_m,formal_depth_trials,practice_depth_trials");
+                "session_id,participant_id,group,condition_order,started_utc,protocol_version,app_version,unity_version,device_model,operating_system,development_build,focal_distance_m,c1_distance_m,c2_distance_m,c3_distance_m,board_tolerance_m,tetris_duration_s,warmup_condition,warmup_tetris_duration_s,minimum_recovery_s,depth_reference_m,depth_difference_m,formal_depth_trials,practice_depth_trials,viewing_distance_reference");
 
             Append(sessionPath, string.Join(",",
                 Csv(SessionId),
@@ -385,7 +385,8 @@ namespace VACExperiment
                 OptionalF(config != null ? config.depthTaskReferenceDistanceMeters : 0f),
                 OptionalF(config != null ? config.depthDifferenceMeters : 0f),
                 I(config != null ? config.formalDepthTrials : 0),
-                I(config != null ? config.practiceDepthTrials : 0)));
+                I(config != null ? config.practiceDepthTrials : 0),
+                Csv("main_camera_to_game_center")));
         }
 
         private static float VacMagnitudeDiopters(

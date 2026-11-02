@@ -1,5 +1,9 @@
 # VAC 交接修改核查（2026-10-28）
 
+> 后续更新：本文记录 10 月 28 日的历史状态。游戏中心距离实现见
+> [GAME_CENTER_DISTANCE.md](GAME_CENTER_DISTANCE.md)。新版本的 Actual、READY、LOCK
+> 和观看距离日志已改用 Main Camera 到游戏中心，不能再按本文的旧锚点定义解读新日志。
+
 ## 来源与实际差异
 
 - 仓库 `DonGCoco/VAC`，目标 PR 基础分支 `feature/vac-experiment`。

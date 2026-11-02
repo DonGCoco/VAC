@@ -7,7 +7,7 @@ namespace VACExperiment
 {
     /// <summary>
     /// Participant-side UI for the handoff after experimenter calibration.
-    /// No distance or calibration information is shown to the participant.
+    /// Shows game-centre distance during calibration and the START handoff only.
     /// START appears only after the spatially anchored board is truly LOCKED.
     /// </summary>
     public class ParticipantStartUI : MonoBehaviour
@@ -23,6 +23,7 @@ namespace VACExperiment
         [SerializeField] private float panelVerticalOffsetMeters = -0.05f;
 
         private GameObject startPanel;
+        private TextMesh distanceText;
         private bool startConsumedForCurrentLock;
 
         private void Start()
@@ -55,7 +56,7 @@ namespace VACExperiment
             startPanel.SetActive(false);
         }
 
-        private void Update()
+        private void LateUpdate()
         {
             if (formalFlow == null)
                 formalFlow = FindAnyObjectByType<FormalExperimentFlowController>();
@@ -78,6 +79,17 @@ namespace VACExperiment
 
             if (startPanel != null && startPanel.activeSelf != visible)
                 startPanel.SetActive(visible);
+
+            // Keep this extra near-field text out of Tetris, depth tasks and questionnaires.
+            bool showDistance = !tetrisManager.IsRunning &&
+                (formalFlow == null || formalFlow.ParticipantStartAllowed);
+            if (distanceText != null)
+            {
+                distanceText.gameObject.SetActive(showDistance);
+                distanceText.text = calibration.HasValidViewingDistance
+                    ? $"Game distance {calibration.ActualDistanceMeters:F3} m"
+                    : "Game distance --";
+            }
         }
 
         private void CreatePanel()
@@ -91,6 +103,23 @@ namespace VACExperiment
             startPanel.transform.localPosition =
                 new Vector3(0f, panelVerticalOffsetMeters, panelDistanceMeters);
             startPanel.transform.localRotation = Quaternion.identity;
+
+            Transform oldDistance = viewer.Find("ParticipantGameDistance");
+            if (oldDistance != null)
+                Destroy(oldDistance.gameObject);
+
+            GameObject distanceObject = new("ParticipantGameDistance");
+            distanceObject.transform.SetParent(viewer, false);
+            distanceObject.transform.localPosition =
+                new Vector3(0f, panelVerticalOffsetMeters - 0.065f, panelDistanceMeters);
+            distanceObject.transform.localRotation = Quaternion.identity;
+            distanceText = distanceObject.AddComponent<TextMesh>();
+            distanceText.anchor = TextAnchor.MiddleCenter;
+            distanceText.alignment = TextAlignment.Center;
+            distanceText.characterSize = 0.0023f;
+            distanceText.fontSize = 36;
+            distanceText.text = "Game distance --";
+            distanceObject.SetActive(false);
 
             GameObject hintObject = new("ReadyHint");
             hintObject.transform.SetParent(startPanel.transform, false);

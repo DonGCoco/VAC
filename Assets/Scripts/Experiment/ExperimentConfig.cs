@@ -14,7 +14,7 @@ namespace VACExperiment
     {
         [Header("Protocol")]
         [Tooltip("Human-readable study/protocol version stored with every M7 session.")]
-        public string protocolVersion = "M7";
+        public string protocolVersion = "M7-game-center";
 
         [Header("VAC conditions (meters)")]
         [Tooltip("Optical focal distance of the Magic Leap 2 setup. Keep configurable until final confirmation.")]
@@ -29,7 +29,7 @@ namespace VACExperiment
         [Tooltip("C3 target viewing distance. Current implementation default; keep configurable for pilot/supervisor updates.")]
         [Min(0.05f)] public float c3DistanceMeters = 1.50f;
 
-        [Tooltip("Allowed absolute difference between target and measured board distance for Ready.")]
+        [Tooltip("Allowed absolute difference between target and Main Camera to game-centre distance for Ready.")]
         [Min(0.001f)] public float boardDistanceToleranceMeters = 0.03f;
 
         [Tooltip("How long a recent QR observation remains valid between Marker Understanding updates.")]
