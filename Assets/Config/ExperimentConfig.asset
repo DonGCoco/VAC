@@ -15,7 +15,7 @@ MonoBehaviour:
   focalDistanceMeters: 0.74
   c1DistanceMeters: 0.8
   c2DistanceMeters: 1
-  c3DistanceMeters: 1.5
+  c3DistanceMeters: 2
   boardDistanceToleranceMeters: 0.03
   markerVisibilityGraceSeconds: 0.5
   visualAngleReferenceDistanceMeters: 1

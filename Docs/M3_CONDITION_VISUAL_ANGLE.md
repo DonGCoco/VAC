@@ -39,7 +39,7 @@ With the current C1/C2/C3 defaults:
 
 - C1 0.80 m -> scale factor 0.80
 - C2 1.00 m -> scale factor 1.00
-- C3 1.50 m -> scale factor 1.50
+- C3 2.00 m -> scale factor 2.00
 
 Scaling is applied once on condition selection, not every frame.
 
@@ -51,7 +51,7 @@ Expected proxy widths are therefore:
 
 - C1 -> 4.8 cm
 - C2 -> 6.0 cm
-- C3 -> 9.0 cm
+- C3 -> 12.0 cm
 
 This proxy is only for validating the condition geometry. In Milestone 4, the formal static Tetris root will replace it while using the same condition-scaling logic.
 
@@ -72,7 +72,7 @@ On device:
 1. Scan/register the board.
 2. Select C1, C2 and C3.
 3. Confirm the white proxy stays on the same registered board plane.
-4. Confirm it changes size with factors 0.80 / 1.00 / 1.50.
+4. Confirm it changes size with factors 0.80 / 1.00 / 2.00.
 5. Confirm changing condition does not move the stimulus toward/away from the board plane.
 6. Confirm head motion does not trigger continuous rescaling.
 
@@ -89,3 +89,10 @@ Validated on Magic Leap 2:
 - No continuous head-motion-driven rescaling was observed.
 
 Milestone 3 is therefore accepted. Absolute physical board-distance accuracy remains the separate pending M2 hardware validation before pilot data collection.
+
+
+## C3 candidate update — 2026-11-04
+
+C3 is now 2.00 m (nominal VAC approximately 0.851 D at the 0.74 m focal plane), pending pilot validation. C1/C2 remain 0.80/1.00 m. Earlier device validation does not validate this new distance.
+
+With the existing -0.40 m vertical offset, 20 rows of 0.02 m cells, 0.002 m border and 0.12 m QR pattern, scale 2.00 gives a signed top-edge-to-QR-pattern clearance of -0.064 m: the game overlaps the QR vertical region by 64 mm if horizontally aligned. Placement and QR size are unchanged; verify layout, physical board bounds and marker detection before pilot use.

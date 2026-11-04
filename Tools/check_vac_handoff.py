@@ -20,7 +20,7 @@ def main():
     config = read("Assets/Scripts/Experiment/ExperimentConfig.cs")
     asset = read("Assets/Config/ExperimentConfig.asset")
     expected = dict(focalDistanceMeters=.74, c1DistanceMeters=.8,
-                    c2DistanceMeters=1, c3DistanceMeters=1.5,
+                    c2DistanceMeters=1, c3DistanceMeters=2,
                     boardDistanceToleranceMeters=.03, tetrisDurationSeconds=900,
                     depthTaskReferenceDistanceMeters=1, formalDepthTrials=8,
                     practiceDepthTrials=3, depthDifferenceMeters=.06,
@@ -58,13 +58,13 @@ def main():
         signed_areas.append((b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0]))
     assert len(signed_areas) == 4 and all(abs(a) == 1 for a in signed_areas)
     assert sum(a > 0 for a in signed_areas) == sum(a < 0 for a in signed_areas) == 2
-    # Defaults: 20 rows, 2 cm cells, 2 mm border, max scale 1.5, 12 cm QR.
-    gap = .4 - (20 * .02 / 2 + .002) * 1.5 - .12 / 2
-    assert math.isclose(gap, .037)
+    # Defaults: 20 rows, 2 cm cells, 2 mm border, max scale 2.0, 12 cm QR.
+    gap = .4 - (20 * .02 / 2 + .002) * 2.0 - .12 / 2
+    assert math.isclose(gap, -.064)
     print("PASS: 14 code/asset candidate values; fixed 12 cm QR; scene placement;")
     print("      LOCK remeasurement; preserved Actual definition; double-sided Z=0 mesh.")
-    print(f"Default maximum-scale QR-pattern clearance: {gap*1000:.1f} mm (excludes white border).")
-    for d in (.8, 1, 1.5):
+    print(f"Default maximum-scale QR-pattern clearance: {gap*1000:.1f} mm (negative = overlap; excludes white border).")
+    for d in (.8, 1, 2):
         print(f"QR-normal example: plane/anchor={d:.2f} m, stimulus={math.hypot(d,.4):.4f} m")
     print("NOT TESTED: Unity API compilation, rendering, gameplay, tracking, physical accuracy.")
 
