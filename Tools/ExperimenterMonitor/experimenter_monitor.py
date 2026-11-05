@@ -99,7 +99,7 @@ button:disabled { opacity: .35; }
   <div class="row">
     <button id="c1" onclick="cmd('C1')">C1 · 0.80 m</button>
     <button id="c2" onclick="cmd('C2')">C2 · 1.00 m</button>
-    <button id="c3" onclick="cmd('C3')">C3 · 1.50 m</button>
+    <button id="c3" onclick="cmd('C3')">C3 · 2.00 m</button>
   </div>
   <div class="small">C1/C2/C3 buttons remain as a development fallback while M6 is being integrated.</div>
 </div>

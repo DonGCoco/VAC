@@ -12,7 +12,7 @@ The central `Assets/Config/ExperimentConfig.asset` contains:
 
 - C1: `0.80 m`
 - C2: `1.00 m`
-- C3: `1.50 m`
+- C3: `2.00 m`
 - Ready tolerance: `±0.03 m`
 - focal distance placeholder: `0.74 m`
 
@@ -58,7 +58,7 @@ Formal experiment CSV logging remains a later milestone.
 2. Build and run on Magic Leap 2.
 3. Confirm the M2 panel appears.
 4. Point the existing controller ray at C1/C2/C3 and select each one.
-5. Confirm the target changes to 0.80 / 1.00 / 1.50 m.
+5. Confirm the target changes to 0.80 / 1.00 / 2.00 m.
 6. With the QR visible, move the board/headset distance:
    - closer than target minus tolerance -> `TOO CLOSE`
    - within tolerance -> `READY`
@@ -68,13 +68,13 @@ Formal experiment CSV logging remains a later milestone.
 
 ## Formal physical-board setup
 
-The phone-displayed 5 cm QR is only a near-range smoke test. It is not the formal marker for the 1.5 m condition.
+The phone-displayed 5 cm QR is only a near-range smoke test. It is not the formal marker for the 2.0 m condition.
 
 For the physical experiment board:
 
 - Print one high-contrast QR with payload `VAC_BOARD_01`.
 - Attach it rigidly and flat to the same physical board that defines the Tetris plane.
-- Use a known measured QR side length. For a maximum viewing distance of 1.5 m, use at least 0.15 m; a slightly larger marker is preferable if the board has room.
+- Use a known measured QR side length. The current configured QR pattern is 0.12 m. Validate detection at the new maximum viewing distance of 2.0 m; marker size has not been changed with the C3 update.
 - Enter the measured black/white QR square side length, excluding the outer white margin, into `Marker Size Meters`.
 - Place the QR outside the active Tetris area if possible, then measure the QR-centre-to-board-reference offset and enter it in `Marker To Board Position Meters` / `Marker To Board Euler Degrees`.
 
@@ -118,7 +118,7 @@ For C1/C2/C3:
 
 - if the registered board plane is at 0.80 m, the Tetris plane is also at that registered plane;
 - if the registered board plane is at 1.00 m, the Tetris plane remains on that plane;
-- if the registered board plane is at 1.50 m, the Tetris plane remains on that plane.
+- if the registered board plane is at 2.00 m, the Tetris plane remains on that plane.
 
 The Tetris root must therefore be parented to `BoardAnchor` and use no implicit local-Z depth offset. Any future marker-to-board displacement remains an explicit, configurable measured transform rather than a hard-coded depth shift.
 
@@ -167,6 +167,6 @@ Failures are also logged with the subsystem/anchor state so device logcat can di
 
 M2 software flow is implemented and device-tested through QR detection, C1/C2/C3 distance states, READY, LOCK, and Magic Leap spatial-anchor stabilization.
 
-Absolute physical-depth accuracy is intentionally still pending. The current screen-displayed QR is only a development proxy, and no independent physical measurement has yet verified that an SDK-reported 0.80 / 1.00 / 1.50 m board distance exactly matches the real eye-to-board distance.
+Absolute physical-depth accuracy is intentionally still pending. The current screen-displayed QR is only a development proxy, and no independent physical measurement has yet verified that an SDK-reported 0.80 / 1.00 / 2.00 m board distance exactly matches the real eye-to-board distance.
 
 Before pilot data collection, repeat the calibration with the final rigid board, a measured printed QR, and an independent physical distance measurement. Do not compensate for any future measured bias with an arbitrary hidden Z offset; resolve it in the registration/calibration layer.

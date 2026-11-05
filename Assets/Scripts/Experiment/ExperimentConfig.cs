@@ -27,7 +27,7 @@ namespace VACExperiment
         [Min(0.05f)] public float c2DistanceMeters = 1.00f;
 
         [Tooltip("C3 target viewing distance. Current implementation default; keep configurable for pilot/supervisor updates.")]
-        [Min(0.05f)] public float c3DistanceMeters = 1.50f;
+        [Min(0.05f)] public float c3DistanceMeters = 2.00f;
 
         [Tooltip("Allowed absolute difference between target and measured board distance for Ready.")]
         [Min(0.001f)] public float boardDistanceToleranceMeters = 0.03f;
