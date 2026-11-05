@@ -430,6 +430,7 @@ GameObject:
   - component: {fileID: 1900000002}
   - component: {fileID: 1900000003}
   - component: {fileID: 1900000005}
+  - component: {fileID: 1900000006}
   m_Layer: 0
   m_Name: M5_DepthTask
   m_TagString: Untagged
@@ -488,6 +489,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 83b9cc1c153e241778c2884ce3c059f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.DataLogger
+--- !u!114 &1900000006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5db0d32a6c54ea9b188bf3f0ae5c211, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.MagicLeapDepthInput
+  depthTask: {fileID: 1900000003}
+  controllerRayOrigin: {fileID: 1381028217}
 --- !u!1 &832524826
 GameObject:
   m_ObjectHideFlags: 0
@@ -649,6 +664,11 @@ PrefabInstance:
 --- !u!4 &1381028216 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7925858141088025043, guid: 2ad7d02c3ee2a447abc9de300646685d, type: 3}
+  m_PrefabInstance: {fileID: 1381028215}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1381028217 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4599726430203391912, guid: 2ad7d02c3ee2a447abc9de300646685d, type: 3}
   m_PrefabInstance: {fileID: 1381028215}
   m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807

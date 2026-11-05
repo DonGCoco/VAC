@@ -35,7 +35,10 @@ namespace VACExperiment
         [SerializeField] private DataLogger dataLogger;
 
         [Header("Interaction")]
-        [SerializeField, Min(1f)] private float selectionHitRadiusMultiplier = 2.5f;
+        [Tooltip("Invisible response rectangles at the fixed reference plane; metres, independent of sphere depth.")]
+        [SerializeField, Min(0.01f)] private float responseRegionWidthMeters = 0.35f;
+        [SerializeField, Min(0.01f)] private float responseRegionHeightMeters = 0.40f;
+        [SerializeField, Min(0.001f)] private float responseCenterGapMeters = 0.06f;
 
         [Header("M5 transition")]
         [SerializeField] private TetrisManager tetrisManager;
@@ -61,6 +64,9 @@ namespace VACExperiment
         private Vector3 rightReferenceScale;
         private Renderer[] tetrisRenderers;
         private GameObject promptObject;
+        private TextMesh promptText;
+        private Vector3 responseOrigin, responseRight, responseUp, responseForward;
+        private int lastResponseFrame = -1;
 
         private void Awake()
         {
@@ -83,6 +89,10 @@ namespace VACExperiment
 
         private void Start()
         {
+            var responseInput = GetComponent<MagicLeapDepthInput>();
+            if (responseInput == null)
+                responseInput = gameObject.AddComponent<MagicLeapDepthInput>();
+            responseInput.enabled = true;
             if (autoStartAfterTetrisForMilestone5 && tetrisManager != null)
                 tetrisManager.onSessionCompleted.AddListener(HandleTetrisCompleted);
         }
@@ -134,22 +144,52 @@ namespace VACExperiment
             if (target == null)
                 return;
 
-            SphereCollider sphereCollider = target.GetComponent<SphereCollider>();
-            if (sphereCollider == null)
-                sphereCollider = target.gameObject.AddComponent<SphereCollider>();
+            // Visual stimuli never receive input. Selection uses two independent,
+            // invisible rectangles on a shared plane, with a central dead zone.
+            foreach (var interactable in target.GetComponentsInChildren<XRSimpleInteractable>(true))
+                interactable.enabled = false;
+            foreach (var collider in target.GetComponentsInChildren<Collider>(true))
+                collider.enabled = false;
+        }
 
-            // Keep the visible depth stimulus unchanged, but make controller-ray
-            // selection forgiving. A Unity primitive sphere has radius 0.5, so
-            // 2.5x gives a ~10 cm invisible hit diameter for the 4 cm target at 1 m.
-            // This improves response usability without changing the visual cue.
-            sphereCollider.radius = 0.5f * Mathf.Max(1f, selectionHitRadiusMultiplier);
+        public bool TryGetResponseSide(Ray ray, out ResponseSide side)
+        {
+            side = default;
+            if (!IsRunning || !isActiveAndEnabled)
+                return false;
+            float denominator = Vector3.Dot(ray.direction, responseForward);
+            // Accept only a forward ray into the trial's response plane.
+            if (denominator <= 0.0001f)
+                return false;
+            float distance = Vector3.Dot(responseOrigin - ray.origin, responseForward) / denominator;
+            if (distance <= 0f)
+                return false;
+            Vector3 offset = ray.GetPoint(distance) - responseOrigin;
+            float x = Vector3.Dot(offset, responseRight);
+            float y = Vector3.Dot(offset, responseUp);
+            float halfGap = Mathf.Max(0.001f, responseCenterGapMeters) * 0.5f;
+            float halfHeight = Mathf.Max(0.01f, responseRegionHeightMeters) * 0.5f;
+            float outerEdge = halfGap + Mathf.Max(0.01f, responseRegionWidthMeters);
+            float absX = Mathf.Abs(x), absY = Mathf.Abs(y);
+            // Ray/plane arithmetic can round an exact edge by a few float ULPs.
+            // Keep gap edges excluded and outer edges included consistently.
+            if (float.IsNaN(x) || float.IsNaN(y) || float.IsInfinity(x) || float.IsInfinity(y) ||
+                (absY > halfHeight && !Mathf.Approximately(absY, halfHeight)) ||
+                absX <= halfGap || Mathf.Approximately(absX, halfGap) ||
+                (absX > outerEdge && !Mathf.Approximately(absX, outerEdge)))
+                return false;
+            side = x < 0f ? ResponseSide.Left : ResponseSide.Right;
+            return true;
+        }
 
-            XRSimpleInteractable interactable =
-                target.GetComponent<XRSimpleInteractable>() ??
-                target.gameObject.AddComponent<XRSimpleInteractable>();
-
-            interactable.selectEntered.RemoveAllListeners();
-            interactable.selectEntered.AddListener(_ => Submit(side));
+        public void SetResponseHover(ResponseSide? side)
+        {
+            if (promptText == null)
+                return;
+            string label = side.HasValue ? side.Value.ToString().ToUpperInvariant() : "--";
+            string message = "WHICH ONE IS FARTHER?\nPoint LEFT / RIGHT; press trigger\nSelection: " + label;
+            if (promptText.text != message)
+                promptText.text = message;
         }
 
         private void CreatePrompt()
@@ -167,11 +207,12 @@ namespace VACExperiment
             promptObject.transform.localRotation = Quaternion.identity;
 
             TextMesh prompt = promptObject.AddComponent<TextMesh>();
+            promptText = prompt;
             prompt.anchor = TextAnchor.MiddleCenter;
             prompt.alignment = TextAlignment.Center;
             prompt.characterSize = 0.0028f;
             prompt.fontSize = 42;
-            prompt.text = "WHICH ONE IS FARTHER?\nPoint and press trigger";
+            SetResponseHover(null);
         }
 
         private void HandleTetrisCompleted()
@@ -273,7 +314,7 @@ namespace VACExperiment
         }
 
         // Editor-only compatibility for KeyboardDebugInput. Formal ML2 input uses
-        // controller-ray target selection; these methods are not shown to participants.
+        // rectangular response selection; these methods are also used by the input adapter.
         public void SubmitLeft()
         {
             Submit(ResponseSide.Left);
@@ -286,9 +327,10 @@ namespace VACExperiment
 
         private void Submit(ResponseSide response)
         {
-            if (!IsRunning)
+            if (!IsRunning || !isActiveAndEnabled || lastResponseFrame == Time.frameCount)
                 return;
 
+            lastResponseFrame = Time.frameCount;
             float reactionTime = Time.realtimeSinceStartup - stimulusOnsetTime;
             ResponseSide correctSide = fartherSides[trialIndex];
             bool correct = response == correctSide;
@@ -352,6 +394,12 @@ namespace VACExperiment
 
             rightTarget.position =
                 viewer.position + forward * rightDepth + right * halfSeparation;
+
+            responseOrigin = viewer.position + forward * referenceDepth;
+            responseRight = right;
+            responseUp = viewer.up.normalized;
+            responseForward = forward;
+            SetResponseHover(null);
 
             ApplyConstantAngularSize(leftTarget, leftReferenceScale, leftDepth);
             ApplyConstantAngularSize(rightTarget, rightReferenceScale, rightDepth);
