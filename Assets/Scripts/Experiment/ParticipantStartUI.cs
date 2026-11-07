@@ -53,6 +53,15 @@ namespace VACExperiment
 
             CreatePanel();
             startPanel.SetActive(false);
+            tetrisManager.onSessionCancelled.AddListener(HandleCancelled);
+        }
+
+        private void HandleCancelled() => startConsumedForCurrentLock = false;
+
+        private void OnDestroy()
+        {
+            if (tetrisManager != null) tetrisManager.onSessionCancelled.RemoveListener(HandleCancelled);
+            if (startPanel != null) Destroy(startPanel);
         }
 
         private void Update()
@@ -68,12 +77,13 @@ namespace VACExperiment
                 startConsumedForCurrentLock = false;
 
             bool flowAllowsStart =
-                formalFlow == null || formalFlow.ParticipantStartAllowed;
+                formalFlow == null || !formalFlow.HasActiveParticipant || formalFlow.ParticipantStartAllowed;
 
             bool visible =
                 locked &&
                 flowAllowsStart &&
-                !tetrisManager.IsRunning &&
+                tetrisManager.isActiveAndEnabled &&
+                !tetrisManager.IsBusy &&
                 !startConsumedForCurrentLock;
 
             if (startPanel != null && startPanel.activeSelf != visible)
@@ -133,8 +143,9 @@ namespace VACExperiment
             if (startConsumedForCurrentLock)
                 return;
 
-            if (calibration.CurrentState != BoardDistanceState.Locked ||
-                !boardRegistration.IsSpatialAnchorTracking)
+            if (!tetrisManager.isActiveAndEnabled || calibration.CurrentState != BoardDistanceState.Locked ||
+                !boardRegistration.IsSpatialAnchorTracking || tetrisManager.IsBusy ||
+                (formalFlow != null && formalFlow.HasActiveParticipant && !formalFlow.ParticipantStartAllowed))
                 return;
 
             startConsumedForCurrentLock = true;

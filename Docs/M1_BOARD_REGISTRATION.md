@@ -10,10 +10,10 @@ No Tetris, VAC-condition logic, depth task, smoothing or spatial-anchor layer is
 
 - Type: QR
 - Payload: `VAC_BOARD_01`
-- Default configured side length: `0.12 m`
+- Pilot1 configured side length: `0.145 m` (physical pattern versus outer white border measurement remains unverified).
 - Detector profile: `Accuracy`
 
-The QR payload and measured physical size are Inspector parameters on `M1_BoardRegistration`. If the printed QR is not exactly 0.12 m wide, enter the measured value before testing.
+The QR payload and measured physical size are Inspector parameters on `M1_BoardRegistration`. Pilot1 uses 0.145 m with automatic size estimation disabled in code, the saved scene and the scene generator. SDK 2.6.0 documents `QRSettings.QRLength` as QR marker length in metres and passes it as `MarkerLength` to OpenXR; those local comments do not resolve whether this particular physical 14.5 cm measurement includes white border. Confirm pattern-only and paper/border sizes separately before interpreting distance accuracy. RESCAN after changing size; do not reuse an old locked anchor. Two-sphere centre separation remains 0.12 m and is unrelated to QR size.
 
 ## Required Magic Leap setting
 

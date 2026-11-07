@@ -359,7 +359,7 @@ namespace VACExperiment
         {
             EnsureHeader(
                 sessionPath,
-                "session_id,participant_id,group,condition_order,started_utc,protocol_version,app_version,unity_version,device_model,operating_system,development_build,focal_distance_m,c1_distance_m,c2_distance_m,c3_distance_m,board_tolerance_m,tetris_duration_s,warmup_condition,warmup_tetris_duration_s,minimum_recovery_s,depth_reference_m,depth_difference_m,formal_depth_trials,practice_depth_trials");
+                "session_id,participant_id,group,condition_order,started_utc,protocol_version,app_version,unity_version,device_model,operating_system,development_build,focal_distance_m,c1_distance_m,c2_distance_m,c3_distance_m,board_tolerance_m,tetris_duration_s,warmup_condition,warmup_tetris_duration_s,minimum_recovery_s,depth_reference_m,depth_difference_m,formal_depth_trials,practice_depth_trials,software_revision,tetris_mode,fall_interval_s,start_mechanism,qr_size_m,qr_size_scope,depth_interaction_version");
 
             Append(sessionPath, string.Join(",",
                 Csv(SessionId),
@@ -385,7 +385,12 @@ namespace VACExperiment
                 OptionalF(config != null ? config.depthTaskReferenceDistanceMeters : 0f),
                 OptionalF(config != null ? config.depthDifferenceMeters : 0f),
                 I(config != null ? config.formalDepthTrials : 0),
-                I(config != null ? config.practiceDepthTrials : 0)));
+                I(config != null ? config.practiceDepthTrials : 0),
+                Csv("Pilot1-20261108"), Csv("fixed-gravity-candidate"),
+                OptionalF(config != null ? Mathf.Max(0.05f, config.tetrisFallIntervalSeconds) : 0f),
+                Csv("participant-START-321"),
+                OptionalF(FindAnyObjectByType<VACExperiment.Board.BoardRegistration>()?.MarkerSizeMeters ?? 0f),
+                Csv("pattern-vs-white-border-unverified"), Csv("sphere-silhouette-rectangles-v2")));
         }
 
         private static float VacMagnitudeDiopters(

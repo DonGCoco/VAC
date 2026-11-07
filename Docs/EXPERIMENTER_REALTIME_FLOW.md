@@ -1,5 +1,7 @@
 # Realtime Experimenter / Participant Handoff
 
+Pilot1 update: retain the existing assignment/questionnaire/calibration/LOCK gates; participant confirms headset START, then sees 3/2/1 before gameplay/exposure begin. Monitor receives the same manager countdown and remaining exposure values and displays waiting/countdown/running. There is no Monitor START override. Cancelled pending countdowns return to preparation; aborted running formal trials require a fresh session. See [Pilot1 report](PILOT1_IMPLEMENTATION.md) for current operations and pending device/network acceptance.
+
 The distance-calibration UI is split by role.
 
 ## Experimenter

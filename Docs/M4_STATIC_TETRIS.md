@@ -1,4 +1,14 @@
-# Milestone 4 — Static Self-Paced Tetris
+# Tetris — current Pilot1 behaviour
+
+**Pilot1-20261108 supersedes the static implementation below.** After existing experimenter preparation/questionnaire/calibration/LOCK, the participant presses the headset START, sees 3, 2, 1, then the first piece spawns and exposure, placement and viewing-distance sampling begin. Waiting/countdown do not consume exposure or accept gameplay. Training and formal tasks both use the countdown.
+
+Automatic one-cell gravity uses shared `ExperimentConfig.tetrisFallIntervalSeconds`, currently **1 second per cell, configurable pilot candidate**, with no score acceleration. New pieces reset gravity time, including after collision, hard drop or top-out. Existing movement, rotation, bumper hard drop, sequences, scoring and clearing remain. Held START must be released before trigger/bumper gameplay arms. Repeated START cannot restart a pending session.
+
+Disable, rescan, loss of spatial LOCK during countdown, or cancel cannot leave a delayed start or signal a completed/depth transition. Pending formal countdown cancellation returns to calibration; aborting a running formal task records cancellation and requires a new session, preserving old rows. Monitor shows waiting/countdown/running and reads the same manager fields as the headset. See [Pilot1 implementation and acceptance](PILOT1_IMPLEMENTATION.md) for current guidance, verification and limitations.
+
+# Historical Milestone 4 — Static Self-Paced Tetris
+
+The remainder records the earlier static implementation and historical tests, not current Pilot1 guidance.
 
 ## Scope
 

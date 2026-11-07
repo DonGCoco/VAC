@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17457deda791a4b2eaa41e2c809a73ce, type: 3}
   m_Name: ExperimentConfig
   m_EditorClassIdentifier: Assembly-CSharp::VACExperiment.ExperimentConfig
+  protocolVersion: Pilot1-20261108
   focalDistanceMeters: 0.74
   c1DistanceMeters: 0.8
   c2DistanceMeters: 1
@@ -20,6 +21,7 @@ MonoBehaviour:
   markerVisibilityGraceSeconds: 0.5
   visualAngleReferenceDistanceMeters: 1
   tetrisDurationSeconds: 900
+  tetrisFallIntervalSeconds: 1
   depthTaskReferenceDistanceMeters: 1
   formalDepthTrials: 8
   practiceDepthTrials: 3

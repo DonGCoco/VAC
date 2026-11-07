@@ -14,7 +14,7 @@ namespace VACExperiment
     {
         [Header("Protocol")]
         [Tooltip("Human-readable study/protocol version stored with every M7 session.")]
-        public string protocolVersion = "M7";
+        public string protocolVersion = "Pilot1-20261108";
 
         [Header("VAC conditions (meters)")]
         [Tooltip("Optical focal distance of the Magic Leap 2 setup. Keep configurable until final confirmation.")]
@@ -42,6 +42,9 @@ namespace VACExperiment
         [Header("Tetris")]
         [Tooltip("Formal exposure duration. Final value should be fixed after pilot testing.")]
         [Min(1f)] public float tetrisDurationSeconds = 900f;
+
+        [Tooltip("Pilot candidate only: seconds per automatic one-cell fall. Same speed for training and all conditions; no score acceleration.")]
+        [Min(0.05f)] public float tetrisFallIntervalSeconds = 1.0f;
 
         [Tooltip("Warm-up condition. C2 is the current comfortable training default; keep configurable until the pilot.")]
         public VacLevel warmupCondition = VacLevel.C2;

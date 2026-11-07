@@ -76,6 +76,10 @@ namespace VACExperiment.EditorTools
             testCube.transform.localScale = new Vector3(0.06f, 0.06f, 0.002f);
 
             registration.Configure(xrOrigin, boardAnchor.transform);
+            var registrationSettings = new SerializedObject(registration);
+            registrationSettings.FindProperty("markerSizeMeters").floatValue = 0.145f;
+            registrationSettings.FindProperty("estimateQrLength").boolValue = false;
+            registrationSettings.ApplyModifiedPropertiesWithoutUndo();
 
             GameObject lightObject = new("M1_DirectionalLight");
             Light light = lightObject.AddComponent<Light>();
