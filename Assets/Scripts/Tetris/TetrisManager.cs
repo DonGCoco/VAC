@@ -5,9 +5,7 @@ using VACExperiment.Board;
 namespace VACExperiment.Tetris
 {
     /// <summary>
-    /// Static/self-paced Tetris for the VAC experiment.
-    /// Pieces never fall automatically. The participant positions/rotates the
-    /// current piece, then explicitly hard-drops it to place it.
+    /// Pilot Tetris: participant START, three-second countdown, then fixed-speed gravity.
     /// </summary>
     public class TetrisManager : MonoBehaviour
     {
@@ -23,8 +21,14 @@ namespace VACExperiment.Tetris
 
         [Header("Events")]
         public UnityEvent onSessionCompleted;
+        public UnityEvent onSessionStarted = new();
+        public UnityEvent onSessionCancelled = new();
 
         public bool IsRunning { get; private set; }
+        public bool IsCountingDown { get; private set; }
+        public bool IsBusy => IsRunning || IsCountingDown;
+        public float CountdownRemainingSeconds { get; private set; }
+        public int CountdownNumber => IsCountingDown ? Mathf.CeilToInt(CountdownRemainingSeconds) : 0;
         public float RemainingSeconds { get; private set; }
         public int Score => score;
         public int LinesCleared => linesCleared;
@@ -52,10 +56,15 @@ namespace VACExperiment.Tetris
         private float viewingDistanceSampleSeconds;
         private float minViewingDistance;
         private float maxViewingDistance;
+        private float countdownStartedAt;
+        private float gravityElapsed;
+        private TextMesh countdownText;
+        public float FallIntervalSeconds => Mathf.Max(0.05f, config != null ? config.tetrisFallIntervalSeconds : 1f);
 
         // Compatibility entry point for the old two-condition flow.
         public void BeginSession(VacCondition newCondition, TetrisSequenceId newSequence)
         {
+            if (IsBusy || !isActiveAndEnabled) return;
             legacyCondition = newCondition;
             useLegacyConditionLogging = true;
             isTrainingSession = false;
@@ -65,6 +74,7 @@ namespace VACExperiment.Tetris
         // New C1/C2/C3 experiment entry point.
         public void BeginSession(VacLevel newCondition, TetrisSequenceId newSequence)
         {
+            if (IsBusy || !isActiveAndEnabled) return;
             vacLevel = newCondition;
             useLegacyConditionLogging = false;
             isTrainingSession = false;
@@ -73,6 +83,7 @@ namespace VACExperiment.Tetris
 
         public void BeginTrainingSession(VacLevel trainingCondition)
         {
+            if (IsBusy || !isActiveAndEnabled) return;
             vacLevel = trainingCondition;
             useLegacyConditionLogging = false;
             isTrainingSession = true;
@@ -104,6 +115,8 @@ namespace VACExperiment.Tetris
             piecesPlaced = 0;
             topOuts = 0;
             placementTimeTotal = 0f;
+            currentPieceSpawnTime = 0f;
+            sessionStartTime = 0f;
             viewingDistanceWeightedTotal = 0f;
             viewingDistanceSampleSeconds = 0f;
             minViewingDistance = float.PositiveInfinity;
@@ -112,30 +125,121 @@ namespace VACExperiment.Tetris
             board.ClearBoard();
             sessionDurationSeconds = Mathf.Max(1f, durationSeconds);
             RemainingSeconds = sessionDurationSeconds;
-            sessionStartTime = Time.realtimeSinceStartup;
-            inputEnabledTime = Time.unscaledTime + startInputGuardSeconds;
-            IsRunning = true;
-
-            SpawnNextPiece();
-
-            Debug.Log(
-                $"M4 static Tetris started: sequence={sequenceId}; " +
-                $"mode=self-paced/no-gravity.");
+            gravityElapsed = 0f;
+            countdownStartedAt = Time.realtimeSinceStartup;
+            CountdownRemainingSeconds = 3f;
+            IsCountingDown = true;
+            ShowCountdown();
+            Debug.Log($"Pilot Tetris countdown: sequence={sequenceId}; 3,2,1; exposure timer not started.");
         }
 
         private void Update()
         {
+            AdvanceSession(Time.realtimeSinceStartup, Time.unscaledDeltaTime);
+        }
+
+        private void AdvanceSession(float now, float deltaSeconds)
+        {
+            if (IsCountingDown)
+            {
+                // Recheck the existing spatial lock throughout countdown.
+                if (boardDistanceCalibration != null &&
+                    boardDistanceCalibration.CurrentState != BoardDistanceState.Locked)
+                {
+                    CancelSession();
+                    return;
+                }
+                CountdownRemainingSeconds = Mathf.Max(0f, 3f - (now - countdownStartedAt));
+                if (CountdownRemainingSeconds > 0f)
+                {
+                    ShowCountdown();
+                    return;
+                }
+                IsCountingDown = false;
+                HideCountdown();
+                sessionStartTime = now;
+                inputEnabledTime = Time.unscaledTime + startInputGuardSeconds;
+                IsRunning = true;
+                SpawnNextPiece();
+                onSessionStarted?.Invoke();
+                Debug.Log($"Pilot Tetris running: sequence={sequenceId}; fallInterval={FallIntervalSeconds:F3}s (candidate).");
+                return; // No gravity or sampling charged to the countdown frame.
+            }
             if (!IsRunning)
                 return;
 
             RemainingSeconds = Mathf.Max(
                 0f,
-                sessionDurationSeconds - (Time.realtimeSinceStartup - sessionStartTime));
+                sessionDurationSeconds - (now - sessionStartTime));
 
             SampleViewingDistance();
 
             if (RemainingSeconds <= 0f)
+            {
                 EndSession();
+                return;
+            }
+            AdvanceGravity(deltaSeconds);
+        }
+
+        private void AdvanceGravity(float deltaSeconds)
+        {
+            gravityElapsed += Mathf.Max(0f, deltaSeconds);
+            while (IsRunning && activePiece != null && gravityElapsed >= FallIntervalSeconds)
+            {
+                gravityElapsed -= FallIntervalSeconds;
+                var fallingPiece = activePiece;
+                if (!fallingPiece.StepDown() || activePiece != fallingPiece)
+                    break; // SpawnNextPiece resets elapsed; never catch up a new piece.
+            }
+        }
+
+        private void ShowCountdown()
+        {
+            if (countdownText == null && Camera.main != null)
+            {
+                var label = new GameObject("PilotTetrisCountdown");
+                label.transform.SetParent(Camera.main.transform, false);
+                label.transform.localPosition = new Vector3(0f, 0f, 0.7f);
+                countdownText = label.AddComponent<TextMesh>();
+                countdownText.anchor = TextAnchor.MiddleCenter;
+                countdownText.alignment = TextAlignment.Center;
+                countdownText.fontSize = 64;
+                countdownText.characterSize = 0.012f;
+            }
+            if (countdownText != null)
+            {
+                countdownText.gameObject.SetActive(true);
+                countdownText.text = CountdownNumber.ToString();
+            }
+        }
+
+        private void HideCountdown()
+        {
+            if (countdownText != null) countdownText.gameObject.SetActive(false);
+        }
+
+        public void CancelSession()
+        {
+            if (!IsBusy) return;
+            IsCountingDown = false;
+            IsRunning = false;
+            CountdownRemainingSeconds = 0f;
+            RemainingSeconds = 0f;
+            gravityElapsed = 0f;
+            HideCountdown();
+            if (activePiece != null) Destroy(activePiece.gameObject);
+            activePiece = null;
+            if (dataLogger != null && dataLogger.HasSession)
+                dataLogger.LogEvent("TetrisCancelled", vacLevel.ToString(), "No completion transition; pending countdown cancelled or running task aborted.");
+            onSessionCancelled?.Invoke();
+        }
+
+        private void OnDisable() => CancelSession();
+
+        private void OnDestroy()
+        {
+            if (countdownText != null) Destroy(countdownText.gameObject);
         }
 
         private void SampleViewingDistance()
@@ -182,13 +286,14 @@ namespace VACExperiment.Tetris
         }
 
         // Kept only so the old keyboard debug component still compiles.
-        // Static Tetris intentionally has no soft/automatic drop.
+        // Bumper hard drop and fixed automatic gravity are the pilot controls.
         public void SetSoftDrop(bool held)
         {
         }
 
         public void EndSessionEarly()
         {
+            if (IsCountingDown) { CancelSession(); return; }
             if (IsRunning)
                 EndSession();
         }
@@ -255,6 +360,7 @@ namespace VACExperiment.Tetris
             }
 
             currentPieceSpawnTime = Time.realtimeSinceStartup;
+            gravityElapsed = 0f;
         }
 
         private void EndSession()
@@ -317,7 +423,7 @@ namespace VACExperiment.Tetris
             }
 
             Debug.Log(
-                $"M4 static Tetris ended: condition={vacLevel}; sequence={sequenceId}; " +
+                $"Pilot Tetris ended: condition={vacLevel}; sequence={sequenceId}; " +
                 $"duration={duration:F1}s; score={score}; lines={linesCleared}; " +
                 $"pieces={piecesPlaced}; topOuts={topOuts}.");
 

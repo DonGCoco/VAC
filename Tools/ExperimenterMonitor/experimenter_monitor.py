@@ -220,7 +220,10 @@ async function refresh() {
       let flowLabel = 'NEXT';
       currentFlowCommand = null;
 
-      if (d.phase === 'WarmupCalibration') {
+      if (d.tetris_countdown) {
+        flowInstruction = 'Participant confirmed START. Countdown ' + Number(d.countdown_number) +
+          ' — exposure timer and gameplay have not started.';
+      } else if (d.phase === 'WarmupCalibration') {
         flowInstruction = 'Warm-up: calibrate at the configured training condition, LOCK, then participant presses START. Training uses sequence T.';
       } else if (d.phase === 'WarmupTetris') {
         flowInstruction = 'Warm-up Tetris is running. Participant practices move / rotate / hard drop.';
@@ -285,24 +288,29 @@ async function refresh() {
       const anchor = d.anchor_tracking ? 'TRACKING' : (d.board_locked ? 'ANCHORING' : 'UNLOCKED');
       document.getElementById('anchor').textContent = 'Spatial anchor · ' + anchor;
       document.getElementById('game').textContent =
-        'Tetris · ' + (d.tetris_running ? 'RUNNING' : 'NOT RUNNING');
+        'Tetris · ' + (d.tetris_countdown ? ('COUNTDOWN ' + Number(d.countdown_number)) :
+          d.tetris_running ? ('RUNNING · ' + Number(d.tetris_remaining_s || 0).toFixed(1) + ' s remaining') :
+          d.tetris_state === 'WaitingParticipant' ? 'WAITING FOR PARTICIPANT START' : 'IDLE');
 
       let instruction = '';
       if (d.state === 'TooClose') instruction = 'Tell participant: move slightly farther away.';
       else if (d.state === 'TooFar') instruction = 'Tell participant: move slightly closer.';
       else if (d.state === 'Ready') instruction = 'READY — tell participant: do not move. Then click LOCK.';
       else if (d.state === 'Locking') instruction = 'Hold still — spatial anchor is locking…';
-      else if (d.state === 'Locked') instruction = 'LOCKED — START is now available inside the headset.';
+      else if (d.state === 'Locked') instruction = d.tetris_countdown ? 'Participant countdown in progress.' :
+        d.tetris_running ? 'Game running.' : d.start_available ?
+          'LOCKED — participant presses START inside the headset.' : 'LOCKED — awaiting experimenter flow preparation.';
       else if (d.state === 'AnchorError') instruction = 'Anchor failed. Click RESCAN and repeat calibration.';
       else instruction = 'Keep the QR visible and ask participant to hold position.';
       document.getElementById('instruction').textContent = instruction;
 
-      document.getElementById('lock').disabled = d.state !== 'Ready' || d.tetris_running;
-      const disableConditions = !!d.tetris_running || !!d.participant_id;
+      const gameBusy = !!d.tetris_running || !!d.tetris_countdown;
+      document.getElementById('lock').disabled = d.state !== 'Ready' || gameBusy;
+      const disableConditions = gameBusy || !!d.participant_id;
       document.getElementById('c1').disabled = disableConditions;
       document.getElementById('c2').disabled = disableConditions;
       document.getElementById('c3').disabled = disableConditions;
-      document.getElementById('rescan').disabled = !!d.tetris_running;
+      document.getElementById('rescan').disabled = gameBusy;
     } else {
       document.getElementById('lock').disabled = true;
       document.getElementById('instruction').textContent =

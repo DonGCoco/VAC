@@ -19,6 +19,8 @@ namespace VACExperiment
         private MagicLeapController controller;
         private bool previousPressed = true;
         private bool wasRunning;
+        private XRRayInteractor controllerRay;
+        private float nextDiagnosticTime;
 
         private void OnEnable()
         {
@@ -37,6 +39,8 @@ namespace VACExperiment
             }
             try
             {
+                if (controllerRayOrigin != null)
+                    controllerRay = controllerRayOrigin.GetComponentInParent<XRRayInteractor>();
                 controller = MagicLeapController.Instance;
                 if (controllerRayOrigin != null)
                     Debug.Log($"M5 depth response ray bound: {controllerRayOrigin.name}.");
@@ -52,9 +56,14 @@ namespace VACExperiment
             const InputTrackingState required = InputTrackingState.Position | InputTrackingState.Rotation;
             bool tracked = controller != null && controller.IsTracked &&
                 (controller.TrackingState & required) == required &&
-                controllerRayOrigin != null && controllerRayOrigin.gameObject.activeInHierarchy;
+                controllerRayOrigin != null && controllerRayOrigin.gameObject.activeInHierarchy &&
+                controllerRay != null && controllerRay.isActiveAndEnabled &&
+                controllerRay.lineType == XRRayInteractor.LineType.StraightLine;
+            // Use the current origin chosen by XRI (it may initialise a child at Awake).
+            Transform rayOrigin = controllerRay != null && controllerRay.rayOriginTransform != null
+                ? controllerRay.rayOriginTransform : controllerRayOrigin;
             Ray ray = tracked
-                ? new Ray(controllerRayOrigin.position, controllerRayOrigin.forward)
+                ? new Ray(rayOrigin.position, rayOrigin.forward)
                 : default;
             ProcessInput(controller != null && controller.TriggerIsPressed, tracked, ray);
         }
@@ -80,6 +89,12 @@ namespace VACExperiment
             }
             bool valid = depthTask.TryGetResponseSide(ray, out ResponseSide side);
             depthTask.SetResponseHover(valid ? (ResponseSide?)side : null);
+            if (Debug.isDebugBuild && Time.unscaledTime >= nextDiagnosticTime)
+            {
+                nextDiagnosticTime = Time.unscaledTime + 1f;
+                Debug.Log($"Pilot depth ray: origin={ray.origin:F4}; direction={ray.direction:F4}; " +
+                    $"selection={(valid ? side.ToString() : "--")}; inner={depthTask.ResponseInnerEdges:F6}.");
+            }
             bool freshPress = pressed && !previousPressed;
             previousPressed = pressed;
             if (!freshPress || !valid)

@@ -52,6 +52,12 @@ namespace VACExperiment
         // Call after the pre-condition SSQ is completed.
         public void ContinueAfterPreConditionQuestionnaire()
         {
+            var formal = FindAnyObjectByType<FormalExperimentFlowController>();
+            if (formal != null && formal.HasActiveParticipant)
+            {
+                Debug.LogWarning("Legacy start ignored: M6 requires the participant START and countdown.");
+                return;
+            }
             experimentManager.BeginCurrentConditionAfterQuestionnaire();
 
             tetrisManager.BeginSession(
@@ -82,6 +88,9 @@ namespace VACExperiment
 
         private void HandleTetrisCompleted()
         {
+            // A legacy component must not launch a second depth block in an M6 session.
+            var formal = FindAnyObjectByType<FormalExperimentFlowController>();
+            if (formal != null && formal.HasActiveParticipant) return;
             experimentManager.MarkPostDepthStarted();
             depthJudgmentManager.BeginFormal(experimentManager.GetCurrentCondition());
         }

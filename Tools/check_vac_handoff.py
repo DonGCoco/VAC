@@ -28,14 +28,15 @@ def main():
                     depthTargetDiameterMeters=.04,
                     targetReferenceScaleDistanceMeters=1,
                     visualAngleReferenceDistanceMeters=1)
+    expected['tetrisFallIntervalSeconds'] = 1
     for key, value in expected.items():
         default = re.search(r"\b" + key + r"\s*=\s*([\d.]+)f?;", config)
         serialized = re.search(r"^  " + key + r": ([\d.]+)$", asset, re.M)
         assert default and serialized, key
         assert float(default[1]) == float(serialized[1]) == value, key
-    assert "markerSizeMeters = 0.12f" in registration
+    assert "markerSizeMeters = 0.145f" in registration
     assert "estimateQrLength = false" in registration
-    assert "markerSizeMeters: 0.12" in scene and "estimateQrLength: 0" in scene
+    assert "markerSizeMeters: 0.145" in scene and "estimateQrLength: 0" in scene
     assert "stimulusOffsetMeters: {x: 0, y: -0.4}" in scene
     assert "new(0f, -0.40f)" in condition
     assert "new Vector3(stimulusOffsetMeters.x, stimulusOffsetMeters.y, 0f)" in condition
@@ -58,10 +59,10 @@ def main():
         signed_areas.append((b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0]))
     assert len(signed_areas) == 4 and all(abs(a) == 1 for a in signed_areas)
     assert sum(a > 0 for a in signed_areas) == sum(a < 0 for a in signed_areas) == 2
-    # Defaults: 20 rows, 2 cm cells, 2 mm border, max scale 2.0, 12 cm QR.
-    gap = .4 - (20 * .02 / 2 + .002) * 2.0 - .12 / 2
-    assert math.isclose(gap, -.064)
-    print("PASS: 14 code/asset candidate values; fixed 12 cm QR; scene placement;")
+    # Defaults: 20 rows, 2 cm cells, 2 mm border, max scale 2.0, 14.5 cm QR.
+    gap = .4 - (20 * .02 / 2 + .002) * 2.0 - .145 / 2
+    assert math.isclose(gap, -.0765)
+    print("PASS: 15 code/asset candidate values; fixed 14.5 cm QR; scene placement;")
     print("      LOCK remeasurement; preserved Actual definition; double-sided Z=0 mesh.")
     print(f"Default maximum-scale QR-pattern clearance: {gap*1000:.1f} mm (negative = overlap; excludes white border).")
     for d in (.8, 1, 2):

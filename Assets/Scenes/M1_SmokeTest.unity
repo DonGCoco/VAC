@@ -166,7 +166,7 @@ MonoBehaviour:
   xrOrigin: {fileID: 0}
   boardAnchor: {fileID: 1700000011}
   targetQrText: VAC_BOARD_01
-  markerSizeMeters: 0.12
+  markerSizeMeters: 0.145
   estimateQrLength: 0
   detectorProfile: 2
   markerToBoardPositionMeters: {x: 0, y: 0, z: 0}
@@ -470,6 +470,8 @@ MonoBehaviour:
   leftTarget: {fileID: 0}
   rightTarget: {fileID: 0}
   dataLogger: {fileID: 1900000005}
+  responseOuterExtentMeters: 0.38
+  responseRegionHeightMeters: 0.4
   tetrisManager: {fileID: 1700000027}
   conditionController: {fileID: 1800000004}
   autoStartAfterTetrisForMilestone5: 1

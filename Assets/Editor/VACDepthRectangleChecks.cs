@@ -15,6 +15,7 @@ namespace VACExperiment.EditorTools
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private static int checks;
+        public static bool ExitAfterChecks = true;
         private static void Check(bool value, string message)
         {
             if (!value) throw new Exception("Depth rectangle check failed: " + message);
@@ -85,8 +86,7 @@ namespace VACExperiment.EditorTools
                 Check(manager.TryGetResponseSide(At(.1f), out side) && side == ResponseSide.Right, "right region");
                 foreach (float x in new[] { -.03f, 0f, .03f, -.381f, .381f })
                     Check(!Side(x), "gap/outer horizontal exclusion " + x);
-                float outerEdge = Get<float>(manager, "responseCenterGapMeters") * .5f +
-                    Get<float>(manager, "responseRegionWidthMeters");
+                float outerEdge = Get<float>(manager, "responseOuterExtentMeters");
                 Check(Side(-outerEdge, .2f) && Side(outerEdge, -.2f), "inclusive configured outer edges");
                 Check(!Side(.1f, .201f) && !Side(-.1f, -.201f), "vertical exclusion");
                 Check(!Side(float.NaN), "invalid intersection rejected");
@@ -94,14 +94,44 @@ namespace VACExperiment.EditorTools
                 Check(!manager.TryGetResponseSide(new Ray(new Vector3(0, 0, 2), Vector3.back), out _), "back side rejected");
                 Check(!manager.TryGetResponseSide(new Ray(new Vector3(.1f, 0, 2), Vector3.forward), out _), "intersection behind ray rejected");
                 viewer.SetPositionAndRotation(new Vector3(3, 2, 1), Quaternion.Euler(10, 50, 0));
-                Check(Side(.1f) && left.position == leftPosition && right.position == rightPosition,
-                    "response plane and spheres world-fixed during trial");
+                Check(!Side(.1f) && left.position == leftPosition && right.position == rightPosition,
+                    "unsafe eye pose rejected; plane and spheres remain world-fixed");
                 manager.SetResponseHover(ResponseSide.Left);
                 Check(Get<TextMesh>(manager, "promptText").text.EndsWith("LEFT"), "left hover text");
                 manager.SetResponseHover(ResponseSide.Right);
                 Check(Get<TextMesh>(manager, "promptText").text.EndsWith("RIGHT"), "right hover text");
                 Check(left.localScale == leftScale && right.localScale == rightScale, "hover does not resize spheres");
                 viewer.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                foreach (ResponseSide farSide in new[] { ResponseSide.Left, ResponseSide.Right })
+                {
+                    Get<System.Collections.Generic.List<ResponseSide>>(manager, "fartherSides")[0] = farSide;
+                    Call(manager, "ShowTrial");
+                    Vector2 inner = manager.ResponseInnerEdges;
+                    float meshLeft = left.GetComponent<MeshFilter>().sharedMesh.vertices.Max(v =>
+                    { Vector3 p = left.TransformPoint(v); return p.x / p.z; });
+                    float meshRight = right.GetComponent<MeshFilter>().sharedMesh.vertices.Min(v =>
+                    { Vector3 p = right.TransformPoint(v); return p.x / p.z; });
+                    Check(Mathf.Abs(inner.x - meshLeft) < .00001f && Mathf.Abs(inner.y - meshRight) < .00001f,
+                        "inner edges match actual rendered mesh projection " + farSide);
+                    Check(inner.x < 0 && inner.y > 0 && !Mathf.Approximately(-inner.x, inner.y),
+                        "independent asymmetric silhouette edges " + farSide);
+                    Ray EyeRay(float x) => new Ray(Vector3.zero, new Vector3(x, 0, 1));
+                    for (int n = 0; n <= 20; n++)
+                        Check(!manager.TryGetResponseSide(EyeRay(Mathf.Lerp(inner.x, inner.y, n / 20f)), out _),
+                            "entire projected inter-sphere gap rejects " + n);
+                    Check(manager.TryGetResponseSide(EyeRay(inner.x - .00002f), out side) && side == ResponseSide.Left,
+                        "left selection starts outside projected visible edge");
+                    Check(manager.TryGetResponseSide(EyeRay(inner.y + .00002f), out side) && side == ResponseSide.Right,
+                        "right selection starts outside projected visible edge");
+                    Vector3 displacedController = new Vector3(.3f, -.1f, -.2f);
+                    Vector3 midpoint = (left.position + right.position) * .5f;
+                    Check(!manager.TryGetResponseSide(new Ray(displacedController, midpoint - displacedController), out _),
+                        "controller-offset ray aimed through visual midpoint rejects");
+                    viewer.position = new Vector3(-.2f, .1f, -.1f);
+                    Check(!manager.TryGetResponseSide(new Ray(viewer.position, midpoint - viewer.position), out _),
+                        "head-moved ray aimed through visual midpoint rejects");
+                    viewer.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                }
                 void Poll(bool pressed, Ray ray, bool tracked = true)
                 {
                     // Edit-mode batch execution has no player frames; each Poll
@@ -139,12 +169,12 @@ namespace VACExperiment.EditorTools
                 }
                 Check(!manager.IsRunning, "eight formal responses complete block");
                 Debug.Log($"VAC_DEPTH_RECTANGLE_CHECKS_PASS count={checks}; real Unity C#, synthetic input (not ML2 acceptance)");
-                if (Application.isBatchMode) EditorApplication.Exit(0);
+                if (Application.isBatchMode && ExitAfterChecks) EditorApplication.Exit(0);
             }
             catch (Exception e)
             {
                 Debug.LogException(e);
-                if (Application.isBatchMode) EditorApplication.Exit(1);
+                if (Application.isBatchMode && ExitAfterChecks) EditorApplication.Exit(1);
                 else throw;
             }
             finally

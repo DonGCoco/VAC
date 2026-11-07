@@ -16,9 +16,11 @@ namespace VACExperiment.Tetris
 
         private MagicLeapController controller;
         private bool subscribed;
+        private bool gameplayArmed;
 
         private void OnEnable()
         {
+            gameplayArmed = false;
             if (tetrisManager == null)
                 tetrisManager = GetComponent<TetrisManager>();
 
@@ -40,6 +42,7 @@ namespace VACExperiment.Tetris
 
         private void OnDisable()
         {
+            gameplayArmed = false;
             if (!subscribed || controller == null)
                 return;
 
@@ -52,7 +55,7 @@ namespace VACExperiment.Tetris
 
         private void HandleTrackpadClick(InputAction.CallbackContext context)
         {
-            if (tetrisManager == null || !tetrisManager.IsRunning)
+            if (!gameplayArmed || tetrisManager == null || !tetrisManager.IsRunning)
                 return;
 
             float x = controller.TouchPosition.x;
@@ -65,20 +68,34 @@ namespace VACExperiment.Tetris
 
         private void HandleTrigger(InputAction.CallbackContext context)
         {
-            if (tetrisManager != null && tetrisManager.IsRunning)
+            if (gameplayArmed && tetrisManager != null && tetrisManager.IsRunning)
                 tetrisManager.RotateClockwise();
         }
 
         private void HandleBumper(InputAction.CallbackContext context)
         {
-            if (tetrisManager != null && tetrisManager.IsRunning)
+            if (gameplayArmed && tetrisManager != null && tetrisManager.IsRunning)
                 tetrisManager.HardDrop();
         }
 
         private void HandleMenu(InputAction.CallbackContext context)
         {
-            if (tetrisManager != null && tetrisManager.IsRunning)
+            if (tetrisManager != null && tetrisManager.IsBusy)
                 tetrisManager.EndSessionEarly();
+        }
+
+        private void Update()
+        {
+            UpdateInputGate(tetrisManager != null && tetrisManager.IsRunning &&
+                controller != null && controller.IsTracked,
+                controller != null && controller.TriggerIsPressed,
+                controller != null && controller.BumperIsPressed);
+        }
+
+        private void UpdateInputGate(bool runningAndTracked, bool triggerPressed, bool bumperPressed)
+        {
+            if (!runningAndTracked) gameplayArmed = false;
+            else if (!triggerPressed && !bumperPressed) gameplayArmed = true;
         }
     }
 }

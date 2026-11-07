@@ -35,10 +35,9 @@ namespace VACExperiment
         [SerializeField] private DataLogger dataLogger;
 
         [Header("Interaction")]
-        [Tooltip("Invisible response rectangles at the fixed reference plane; metres, independent of sphere depth.")]
-        [SerializeField, Min(0.01f)] private float responseRegionWidthMeters = 0.35f;
+        [Tooltip("World-fixed response-plane outer horizontal extent; inner edges derive from sphere silhouettes each trial.")]
+        [SerializeField, Min(0.01f)] private float responseOuterExtentMeters = 0.38f;
         [SerializeField, Min(0.01f)] private float responseRegionHeightMeters = 0.40f;
-        [SerializeField, Min(0.001f)] private float responseCenterGapMeters = 0.06f;
 
         [Header("M5 transition")]
         [SerializeField] private TetrisManager tetrisManager;
@@ -66,6 +65,14 @@ namespace VACExperiment
         private GameObject promptObject;
         private TextMesh promptText;
         private Vector3 responseOrigin, responseRight, responseUp, responseForward;
+        private Vector3 trialEyePosition, leftSphereCenter, rightSphereCenter;
+        private float leftSphereRadius, rightSphereRadius;
+        private Vector3[] leftVisibleVertices, rightVisibleVertices;
+        private float leftInnerEdge, rightInnerEdge;
+        // A one-micrometre outward guard never expands selection into the gap.
+        private const float ResponseEdgeGuardMeters = 0.000001f;
+        private bool responseGeometryValid;
+        public Vector2 ResponseInnerEdges => new(leftInnerEdge, rightInnerEdge);
         private int lastResponseFrame = -1;
 
         private void Awake()
@@ -155,7 +162,7 @@ namespace VACExperiment
         public bool TryGetResponseSide(Ray ray, out ResponseSide side)
         {
             side = default;
-            if (!IsRunning || !isActiveAndEnabled)
+            if (!IsRunning || !isActiveAndEnabled || !responseGeometryValid)
                 return false;
             float denominator = Vector3.Dot(ray.direction, responseForward);
             // Accept only a forward ray into the trial's response plane.
@@ -167,19 +174,99 @@ namespace VACExperiment
             Vector3 offset = ray.GetPoint(distance) - responseOrigin;
             float x = Vector3.Dot(offset, responseRight);
             float y = Vector3.Dot(offset, responseUp);
-            float halfGap = Mathf.Max(0.001f, responseCenterGapMeters) * 0.5f;
             float halfHeight = Mathf.Max(0.01f, responseRegionHeightMeters) * 0.5f;
-            float outerEdge = halfGap + Mathf.Max(0.01f, responseRegionWidthMeters);
+            float outerEdge = Mathf.Max(0.01f, responseOuterExtentMeters);
             float absX = Mathf.Abs(x), absY = Mathf.Abs(y);
-            // Ray/plane arithmetic can round an exact edge by a few float ULPs.
-            // Keep gap edges excluded and outer edges included consistently.
             if (float.IsNaN(x) || float.IsNaN(y) || float.IsInfinity(x) || float.IsInfinity(y) ||
                 (absY > halfHeight && !Mathf.Approximately(absY, halfHeight)) ||
-                absX <= halfGap || Mathf.Approximately(absX, halfGap) ||
                 (absX > outerEdge && !Mathf.Approximately(absX, outerEdge)))
                 return false;
-            side = x < 0f ? ResponseSide.Left : ResponseSide.Right;
+            // The nominal rectangles are fixed for the trial. A controller can
+            // originate far from the eye: its ray can cross this plane outside
+            // the nominal gap yet still pass between the visible spheres.
+            // Veto that parallax case using the actual ray origin and current eye.
+            if (!TryProjectedGap(ray.origin, out float rayLeft, out float rayRight) ||
+                viewer == null || !TryProjectedGap(viewer.position, out float eyeLeft, out float eyeRight))
+                return false;
+            float safeLeft = Mathf.Min(leftInnerEdge, Mathf.Min(rayLeft, eyeLeft));
+            float safeRight = Mathf.Max(rightInnerEdge, Mathf.Max(rayRight, eyeRight));
+            if (x <= safeLeft - ResponseEdgeGuardMeters) side = ResponseSide.Left;
+            else if (x >= safeRight + ResponseEdgeGuardMeters) side = ResponseSide.Right;
+            else return false;
             return true;
+        }
+
+        private bool TryProjectedGap(Vector3 observer, out float left, out float right)
+        {
+            left = right = 0f;
+            float planeDepth = Vector3.Dot(responseOrigin - observer, responseForward);
+            float observerX = Vector3.Dot(observer - responseOrigin, responseRight);
+            if (!ProjectSphereInner(observer, leftSphereCenter, leftSphereRadius, leftVisibleVertices, planeDepth, true, out float l) ||
+                !ProjectSphereInner(observer, rightSphereCenter, rightSphereRadius, rightVisibleVertices, planeDepth, false, out float r))
+                return false;
+            left = observerX + l;
+            right = observerX + r;
+            return left < right;
+        }
+
+        private bool ProjectSphereInner(Vector3 observer, Vector3 center, float radius, Vector3[] visibleVertices,
+            float planeDepth, bool leftSphere, out float projected)
+        {
+            projected = 0f;
+            Vector3 v = center - observer;
+            double x = Vector3.Dot(v, responseRight), z = Vector3.Dot(v, responseForward), r = radius;
+            if (planeDepth <= 0f || r <= 0 || z <= r) return false;
+            // Exact tangent slopes of the sphere's horizontal perspective silhouette.
+            // Account separately for each world radius and depth; no fixed diameter/gap.
+            double tangent = r * Math.Sqrt(x * x + z * z - r * r);
+            double slope = (x * z + (leftSphere ? tangent : -tangent)) / (z * z - r * r);
+            // Unity's rendered sphere is a tessellated mesh. Its inward outline
+            // can sit slightly outside the ideal smooth-sphere tangent; never
+            // permit clicks in that small extra visible gap. Projection extrema
+            // of a triangle with positive depths occur at its vertices.
+            if (visibleVertices == null || visibleVertices.Length == 0) return false;
+            double meshSlope = leftSphere ? double.NegativeInfinity : double.PositiveInfinity;
+            foreach (Vector3 vertex in visibleVertices)
+            {
+                Vector3 relative = vertex - observer;
+                double depth = Vector3.Dot(relative, responseForward);
+                if (depth <= 0) return false;
+                double value = Vector3.Dot(relative, responseRight) / depth;
+                meshSlope = leftSphere ? Math.Max(meshSlope, value) : Math.Min(meshSlope, value);
+            }
+            slope = leftSphere ? Math.Min(slope, meshSlope) : Math.Max(slope, meshSlope);
+            projected = (float)(planeDepth * slope);
+            return !float.IsNaN(projected) && !float.IsInfinity(projected);
+        }
+
+        private void CaptureResponseGeometry()
+        {
+            trialEyePosition = viewer.position;
+            leftSphereCenter = leftTarget.position;
+            rightSphereCenter = rightTarget.position;
+            leftVisibleVertices = CaptureVisibleVertices(leftTarget);
+            rightVisibleVertices = CaptureVisibleVertices(rightTarget);
+            Vector3 ls = leftTarget.lossyScale, rs = rightTarget.lossyScale;
+            leftSphereRadius = Mathf.Max(Mathf.Abs(ls.x), Mathf.Max(Mathf.Abs(ls.y), Mathf.Abs(ls.z))) * 0.5f;
+            rightSphereRadius = Mathf.Max(Mathf.Abs(rs.x), Mathf.Max(Mathf.Abs(rs.y), Mathf.Abs(rs.z))) * 0.5f;
+            responseGeometryValid = TryProjectedGap(trialEyePosition, out leftInnerEdge, out rightInnerEdge);
+            Debug.Log($"Pilot depth geometry v2: trial={trialIndex + 1}; plane={responseOrigin:F4}; " +
+                $"leftInner={leftInnerEdge:F6}; rightInner={rightInnerEdge:F6}; " +
+                $"radii={leftSphereRadius:F6}/{rightSphereRadius:F6}; valid={responseGeometryValid}; " +
+                "fixed trial rectangles; live eye/ray-origin silhouette veto (conservative).");
+        }
+
+        private static Vector3[] CaptureVisibleVertices(Transform target)
+        {
+            var vertices = new List<Vector3>();
+            foreach (var filter in target.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var renderer = filter.GetComponent<MeshRenderer>();
+                if (filter.sharedMesh == null || renderer == null || !renderer.enabled) continue;
+                foreach (Vector3 vertex in filter.sharedMesh.vertices)
+                    vertices.Add(filter.transform.TransformPoint(vertex));
+            }
+            return vertices.ToArray(); // Cached once per trial, never reallocated per input frame.
         }
 
         public void SetResponseHover(ResponseSide? side)
@@ -403,6 +490,7 @@ namespace VACExperiment
 
             ApplyConstantAngularSize(leftTarget, leftReferenceScale, leftDepth);
             ApplyConstantAngularSize(rightTarget, rightReferenceScale, rightDepth);
+            CaptureResponseGeometry();
 
             SetTargetsVisible(true);
             SetPromptVisible(true);

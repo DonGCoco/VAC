@@ -9,10 +9,12 @@ namespace VACExperiment
     {
         Idle,
         WarmupCalibration,
+        WarmupCountdown,
         WarmupTetris,
         WarmupDepthPractice,
         PreBlockQuestionnaire,
         BlockCalibration,
+        FormalCountdown,
         FormalTetris,
         FormalDepth,
         PostBlockQuestionnaire,
@@ -53,8 +55,8 @@ namespace VACExperiment
         public int CurrentBlockIndex =>
             participantSession != null ? participantSession.CurrentBlockIndex : 0;
         public bool ParticipantStartAllowed =>
-            Phase == FormalExperimentPhase.WarmupCalibration ||
-            Phase == FormalExperimentPhase.BlockCalibration;
+            isActiveAndEnabled && (Phase == FormalExperimentPhase.WarmupCalibration ||
+            Phase == FormalExperimentPhase.BlockCalibration);
         public bool HasActiveParticipant =>
             participantSession != null && participantSession.HasAssignment;
         public float RecoveryRemainingSeconds =>
@@ -84,6 +86,11 @@ namespace VACExperiment
         private void OnDestroy()
         {
             DetachListeners();
+        }
+
+        private void OnDisable()
+        {
+            if (tetrisManager != null && tetrisManager.IsBusy) tetrisManager.CancelSession();
         }
 
         public void SetParticipantSession(ParticipantSession session)
@@ -133,7 +140,9 @@ namespace VACExperiment
         {
             ResolveReferences();
 
-            if (!ParticipantStartAllowed)
+            if (!isActiveAndEnabled || !ParticipantStartAllowed || tetrisManager == null ||
+                tetrisManager.IsBusy || calibration == null ||
+                calibration.CurrentState != BoardDistanceState.Locked || !calibration.IsBoardLocked)
             {
                 Debug.LogWarning(
                     $"Participant START ignored during phase {Phase}.");
@@ -144,8 +153,8 @@ namespace VACExperiment
             {
                 SetLoggerContextForWarmup(calibration.LockedDistanceMeters);
                 SetPhase(
-                    FormalExperimentPhase.WarmupTetris,
-                    "WarmupStarted",
+                    FormalExperimentPhase.WarmupCountdown,
+                    "WarmupCountdownStarted",
                     config != null ? config.warmupCondition : VacLevel.C2);
                 tetrisManager.BeginTrainingSession(
                     config != null ? config.warmupCondition : VacLevel.C2);
@@ -159,13 +168,12 @@ namespace VACExperiment
                 TetrisSequenceId sequence = participantSession.GetSequenceForBlock(block);
 
                 SetLoggerContextForFormalBlock(block, calibration.LockedDistanceMeters);
-                dataLogger.LogBlockCalibration();
                 dataLogger.LogEvent(
-                    "FormalBlockStarted",
+                    "FormalCountdownStarted",
                     condition.ToString(),
                     $"Block={block};Sequence={sequence}");
 
-                SetPhase(FormalExperimentPhase.FormalTetris);
+                SetPhase(FormalExperimentPhase.FormalCountdown);
                 tetrisManager.BeginSession(condition, sequence);
             }
         }
@@ -312,6 +320,30 @@ namespace VACExperiment
             depthJudgmentManager.BeginFormal(condition);
         }
 
+        private void HandleTetrisStarted()
+        {
+            if (Phase == FormalExperimentPhase.WarmupCountdown)
+                SetPhase(FormalExperimentPhase.WarmupTetris, "WarmupStarted", config.warmupCondition);
+            else if (Phase == FormalExperimentPhase.FormalCountdown)
+            {
+                dataLogger?.LogBlockCalibration();
+                SetPhase(FormalExperimentPhase.FormalTetris, "FormalBlockStarted",
+                    participantSession.GetConditionForBlock(participantSession.CurrentBlockIndex));
+            }
+        }
+
+        private void HandleTetrisCancelled()
+        {
+            if (Phase == FormalExperimentPhase.WarmupCountdown || Phase == FormalExperimentPhase.WarmupTetris)
+                SetPhase(FormalExperimentPhase.WarmupCalibration, "WarmupCancelled");
+            else if (Phase == FormalExperimentPhase.FormalCountdown)
+                SetPhase(FormalExperimentPhase.BlockCalibration, "FormalTetrisCancelled");
+            else if (Phase == FormalExperimentPhase.FormalTetris)
+                // Do not append a replacement block into an aborted formal run.
+                // Reassign a fresh session before collecting formal data again.
+                SetPhase(FormalExperimentPhase.Idle, "FormalRunAborted");
+        }
+
         private void HandleDepthCompleted()
         {
             if (Phase == FormalExperimentPhase.WarmupDepthPractice)
@@ -402,6 +434,8 @@ namespace VACExperiment
                 return;
 
             tetrisManager.onSessionCompleted.AddListener(HandleTetrisCompleted);
+            tetrisManager.onSessionStarted.AddListener(HandleTetrisStarted);
+            tetrisManager.onSessionCancelled.AddListener(HandleTetrisCancelled);
             depthJudgmentManager.onBlockCompleted.AddListener(HandleDepthCompleted);
             listenersAttached = true;
         }
@@ -412,7 +446,11 @@ namespace VACExperiment
                 return;
 
             if (tetrisManager != null)
+            {
                 tetrisManager.onSessionCompleted.RemoveListener(HandleTetrisCompleted);
+                tetrisManager.onSessionStarted.RemoveListener(HandleTetrisStarted);
+                tetrisManager.onSessionCancelled.RemoveListener(HandleTetrisCancelled);
+            }
 
             if (depthJudgmentManager != null)
                 depthJudgmentManager.onBlockCompleted.RemoveListener(HandleDepthCompleted);

@@ -70,6 +70,11 @@ namespace VACExperiment
             public bool board_locked;
             public bool anchor_tracking;
             public bool tetris_running;
+            public bool tetris_countdown;
+            public int countdown_number;
+            public float countdown_remaining_s;
+            public float tetris_remaining_s;
+            public string tetris_state;
             public bool start_available;
             public float seconds_since_marker_seen;
             public string participant_id;
@@ -176,10 +181,21 @@ namespace VACExperiment
                 board_locked = calibration.IsBoardLocked,
                 anchor_tracking = boardRegistration.IsSpatialAnchorTracking,
                 tetris_running = tetrisManager != null && tetrisManager.IsRunning,
+                tetris_countdown = tetrisManager != null && tetrisManager.IsCountingDown,
+                countdown_number = tetrisManager != null ? tetrisManager.CountdownNumber : 0,
+                countdown_remaining_s = tetrisManager != null ? tetrisManager.CountdownRemainingSeconds : 0f,
+                tetris_remaining_s = tetrisManager != null ? tetrisManager.RemainingSeconds : 0f,
+                tetris_state = tetrisManager != null && tetrisManager.IsCountingDown ? "Countdown" :
+                    tetrisManager != null && tetrisManager.IsRunning ? "Running" :
+                    tetrisManager != null && tetrisManager.isActiveAndEnabled &&
+                    calibration.CurrentState == BoardDistanceState.Locked &&
+                    boardRegistration.IsSpatialAnchorTracking &&
+                    (formalFlow == null || !formalFlow.HasActiveParticipant || formalFlow.ParticipantStartAllowed)
+                        ? "WaitingParticipant" : "Idle",
                 start_available =
                     calibration.CurrentState == BoardDistanceState.Locked &&
                     boardRegistration.IsSpatialAnchorTracking &&
-                    (tetrisManager == null || !tetrisManager.IsRunning) &&
+                    tetrisManager != null && tetrisManager.isActiveAndEnabled && !tetrisManager.IsBusy &&
                     (formalFlow == null || !formalFlow.HasActiveParticipant || formalFlow.ParticipantStartAllowed),
                 seconds_since_marker_seen = boardRegistration.SecondsSinceMarkerSeen,
                 participant_id = participantSession != null ? participantSession.ParticipantId : "",
@@ -190,6 +206,7 @@ namespace VACExperiment
                     formalFlow != null &&
                     formalFlow.HasActiveParticipant &&
                     (formalFlow.Phase == FormalExperimentPhase.WarmupCalibration ||
+                     formalFlow.Phase == FormalExperimentPhase.WarmupCountdown ||
                      formalFlow.Phase == FormalExperimentPhase.WarmupTetris ||
                      formalFlow.Phase == FormalExperimentPhase.WarmupDepthPractice)
                         ? "T"
@@ -541,6 +558,11 @@ namespace VACExperiment
                 case "C1":
                 case "C2":
                 case "C3":
+                    if (tetrisManager != null && tetrisManager.IsBusy)
+                    {
+                        Debug.LogWarning("Condition change ignored during Tetris countdown/running.");
+                        return;
+                    }
                     if (formalFlow != null && formalFlow.HasActiveParticipant)
                     {
                         Debug.LogWarning(

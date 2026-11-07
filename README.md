@@ -1,5 +1,9 @@
 # VAC — Magic Leap 2 Experiment Framework
 
+## Pilot1 revision — Pilot1-20261108
+
+Current branch implements participant START → 3/2/1 → automatic Tetris fall; silhouette-derived inter-sphere exclusion with controller/eye parallax veto; fixed QR size **0.145 m** (physical white-border scope unverified). Sphere centre separation remains **0.12 m**. Fall interval **1 s/cell is a configurable candidate**, not a frozen experimental value. See [implementation, checks and pending ML2 acceptance](Docs/PILOT1_IMPLEMENTATION.md). Earlier static/fixed-gap device results do not validate this revision. New session metadata distinguishes this protocol from old pilot data.
+
 Group 5 experimental codebase for a within-subject study of vergence–accommodation conflict (VAC) using Magic Leap 2. 
 
 ## Current status

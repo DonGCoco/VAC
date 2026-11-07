@@ -29,7 +29,7 @@ namespace VACExperiment.Board
 
         [Tooltip("Measured physical side length of the QR marker in metres, excluding the outer white margin. Used when automatic size estimation is disabled.")]
         [Min(0.01f)]
-        [SerializeField] private float markerSizeMeters = 0.12f;
+        [SerializeField] private float markerSizeMeters = 0.145f;
 
         [Tooltip("Development aid for temporary/screen-displayed QR markers. When enabled, Magic Leap estimates QR size instead of trusting Marker Size Meters. Disable for the formal board once the printed QR size is known exactly.")]
         [SerializeField] private bool estimateQrLength = false;
@@ -50,6 +50,7 @@ namespace VACExperiment.Board
 
         public bool IsMarkerVisible { get; private set; }
         public bool HasRegisteredBoard { get; private set; }
+        public float MarkerSizeMeters => markerSizeMeters;
         public bool IsPoseLocked { get; private set; }
         public Transform BoardAnchor => boardAnchor;
         public bool IsSpatialAnchorTracking =>

@@ -1,5 +1,9 @@
 # Milestone 7 — Logging and Dry Run
 
+## Pilot1 metadata update (2026-11-08)
+
+Current protocol is `Pilot1-20261108`. Session metadata additionally records `software_revision`, `tetris_mode`, shared candidate `fall_interval_s`, `start_mechanism=participant-START-321`, actual configured `qr_size_m`, unverified `qr_size_scope`, and `depth_interaction_version=sphere-silhouette-rectangles-v2`. Task CSV response/RT columns and the five-file export mechanism are unchanged. Countdown start is a distinct event; actual exposure-start events and formal block rows occur only after 321. Cancellation does not fabricate a completed block. Old session directories remain untouched; do not backfill these columns or pool old pilot versions without accounting for changed interaction and gravity. See [Pilot1 acceptance](PILOT1_IMPLEMENTATION.md).
+
 ## What M7 now records
 
 Every participant run creates a new timestamped session folder:

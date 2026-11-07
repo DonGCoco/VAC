@@ -172,8 +172,8 @@ namespace VACExperiment.Board
 
         public void RescanBoard()
         {
-            if (tetrisManager != null && tetrisManager.IsRunning)
-                tetrisManager.EndSessionEarly();
+            if (tetrisManager != null && tetrisManager.IsBusy)
+                tetrisManager.CancelSession();
 
             boardRegistration.UnlockBoardPose();
             LockedDistanceMeters = 0f;
@@ -189,7 +189,7 @@ namespace VACExperiment.Board
             }
 
             if (CurrentState != BoardDistanceState.Locked ||
-                !boardRegistration.IsSpatialAnchorTracking)
+                !boardRegistration.IsSpatialAnchorTracking || tetrisManager.IsBusy)
             {
                 Debug.LogWarning(
                     "M4 Tetris can only start after the board reports LOCKED.");

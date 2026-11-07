@@ -1,5 +1,7 @@
 # Milestone 5 — Fixed Depth Judgement Task
 
+Pilot1 changes and current acceptance results: [PILOT1_IMPLEMENTATION.md](PILOT1_IMPLEMENTATION.md). The earlier `DEPTH_RECTANGLE_VALIDATION.md` is historical.
+
 ## Scope
 
 M5 implements the configurable two-target depth judgement task.
@@ -42,18 +44,24 @@ The spheres are visual stimuli only. Their colliders and `XRSimpleInteractable` 
 
 Point the ML2 controller ray through an invisible left/right rectangle, then press the trigger to confirm which sphere is farther. The existing prompt shows `LEFT`, `RIGHT`, or `--`; pointing alone does not answer. No rectangle renderer, border or sphere highlight is added.
 
-At each trial onset the response plane captures the viewer pose at the configured reference depth (currently 1 m), independently of which sphere is farther. It stays world-fixed until the response. Inspector defaults are candidates awaiting device layout acceptance:
+Pilot1 (`Pilot1-20261108`) replaces the fixed 6 cm gap. At trial onset, the plane captures the viewer pose at reference depth (currently 1 m). After existing size compensation, each actual world sphere centre/radius and rendered mesh determine its horizontal perspective silhouette on that plane. The mesh outline conservatively guards the ideal sphere tangent against tessellation differences. Left selection starts outside the left sphere's inward silhouette; right selection outside the right sphere's inward silhouette. Different depths produce separate, generally asymmetric boundaries, not 0.12 minus a fixed diameter. Geometry defaults remain candidates awaiting device acceptance:
 
-- centre gap: 0.06 m; x from -0.03 to +0.03 m, including its boundaries, rejects input;
-- each rectangle width: 0.35 m; outer x approximately -0.38 / +0.38 m;
+- the entire interval between computed inner edges rejects input, with a conservative one-micrometre outward guard;
+- outer x limit remains -0.38 / +0.38 m;
 - height: 0.40 m; y from -0.20 to +0.20 m;
-- outer edges are included as represented by the configured floating-point geometry; rays parallel to or entering from behind the plane, and intersections behind the ray origin, are rejected.
+- outer edges are included within floating-point roundoff; parallel/back-facing/behind-origin/invalid intersections reject input.
+
+The nominal rectangles and spheres stay world-fixed for the trial. A single fixed plane cannot align with both sphere depths for every displaced eye/controller. Selection uses XRI's actual current straight-ray origin and also vetoes the silhouette gap from that origin and the current eye. This conservatively shrinks selectable regions when needed, without moving base rectangles or expanding selection into the gap. Large motion can reject an otherwise outward point; exact edge coincidence for every pose is not claimed. Verify this on ML2 rather than increasing a constant gap. Invalid/behind-plane eye poses reject selection.
+
+Development logs `Pilot depth geometry v2` record the plane, independent edges and radii each trial; `Pilot depth ray` records actual ray origin/direction and selection at most once per second. They are diagnostics, not answer rows or evidence that the reported pilot video/root cause was reproduced.
 
 `MagicLeapDepthInput` is explicitly enabled on `M5_DepthTask` in `M1_SmokeTest`, with its manager assigned and `Controller Ray Origin` linked to the official ML Rig's `Controller` transform. That is the existing straight XRRayInteractor origin (no custom ray-origin override in the prefab). The manager also enables/adds an adapter at Start for other scenes. Auto-resolution only accepts one active XRI ray; scenes with multiple rays must explicitly assign the ML2 controller. Trigger and tracking actions come from the existing ML2 `Controller` action map; the rig's InputActionManager is unchanged.
 
 The adapter consumes every fresh trigger press, even in the central gap or outside a rectangle. Holding the trigger, moving between rectangles while held, or holding it before block onset cannot submit another answer. After tracking loss (including missing position/rotation tracking), disable/re-enable, or a block start, it must observe release before another press can answer. The manager additionally rejects duplicate responses in the same frame. Other UI and Tetris input scripts are unchanged.
 
-## M5 device-test transition
+## Historical M5 device-test transition
+
+The current saved scene uses the M6 formal controller: training countdown/game leads to 3 practice trials; each formal countdown/game leads to 8 formal trials after the existing gates. The standalone transition below is a legacy milestone reference, not an additional simultaneous listener in Pilot1.
 
 For this milestone only, completion/early termination of the M4 Tetris test automatically:
 
