@@ -543,6 +543,20 @@ namespace VACExperiment
             return true;
         }
 
+        [Serializable]
+        private class CommandReply
+        {
+            public bool ok;
+            public string message;
+        }
+
+        private void ReplyToCommand(IPEndPoint remote, bool ok, string message)
+        {
+            var reply = new CommandReply { ok = ok, message = message };
+            byte[] payload = Encoding.UTF8.GetBytes(JsonUtility.ToJson(reply));
+            commandReceiver.Send(payload, payload.Length, remote);
+        }
+
         private void HandleCommand(string command, IPEndPoint remote)
         {
             // Once paired, only accept experiment commands from the paired laptop.
@@ -579,16 +593,34 @@ namespace VACExperiment
                     break;
 
                 case "LOCK":
-                    calibration.LockBoardPose();
+                    string lockError = calibration.TryLockBoardPose();
+                    ReplyToCommand(remote, lockError == null,
+                        lockError ?? "Lock accepted. Check anchor status before START.");
                     break;
                 case "RESCAN":
                     calibration.RescanBoard();
                     break;
                 case "CONTINUE":
-                    formalFlow?.ContinueAfterQuestionnaire();
-                    break;
                 case "RECOVERY_DONE":
-                    formalFlow?.ContinueAfterRecovery();
+                    if (formalFlow == null)
+                    {
+                        ReplyToCommand(remote, false, "Experiment flow is unavailable.");
+                        return;
+                    }
+
+                    var previousPhase = formalFlow.Phase;
+                    if (command == "CONTINUE")
+                        formalFlow.ContinueAfterQuestionnaire();
+                    else
+                        formalFlow.ContinueAfterRecovery();
+
+                    bool advanced = formalFlow.Phase != previousPhase;
+                    string message = advanced
+                        ? $"Headset advanced to {formalFlow.Phase}."
+                        : command == "RECOVERY_DONE" && previousPhase == FormalExperimentPhase.Recovery
+                            ? $"Recovery still in progress ({formalFlow.RecoveryRemainingSeconds:F0} s left)."
+                            : $"Command unavailable during {previousPhase}.";
+                    ReplyToCommand(remote, advanced, message);
                     break;
                 case "DEV_SKIP_RECOVERY":
                     formalFlow?.SkipRecoveryForDevelopment();

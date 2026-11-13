@@ -31,6 +31,7 @@ DATA_TRANSFER_PORT = 45557
 HTTP_HOST = "127.0.0.1"
 HTTP_PORT = 8765
 DISCOVERY_INTERVAL_SECONDS = 0.75
+CONFIRMED_COMMANDS = {"LOCK", "CONTINUE", "RECOVERY_DONE"}
 DISCOVERY_MESSAGE = f"VAC_MONITOR_DISCOVER:{STATUS_PORT}".encode("utf-8")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -136,26 +137,27 @@ button:disabled { opacity: .35; }
 
 <script>
 let currentFlowCommand = null;
+let commandPending = false;
 
 async function cmd(command) {
   const status = document.getElementById('commandStatus');
+  if (commandPending) return false;
+  commandPending = true;
+  if (status) status.textContent = 'Waiting for headset · ' + command;
   try {
     const response = await fetch('/command', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({command})
     });
-
-    if (!response.ok) {
-      if (status) status.textContent = 'Command failed: ' + command + ' · HTTP ' + response.status;
-      return false;
-    }
-
-    if (status) status.textContent = 'Command sent: ' + command;
-    return true;
+    const result = await response.json();
+    if (status) status.textContent = result.message || ('Command failed · HTTP ' + response.status);
+    return response.ok && result.ok;
   } catch (e) {
-    if (status) status.textContent = 'Command failed: ' + command + ' · ' + e;
+    if (status) status.textContent = 'Monitor request failed · ' + command;
     return false;
+  } finally {
+    commandPending = false;
   }
 }
 
@@ -269,7 +271,7 @@ async function refresh() {
       document.getElementById('flowInstruction').textContent = flowInstruction;
       const flowButton = document.getElementById('flowAction');
       flowButton.textContent = flowLabel;
-      flowButton.disabled = !currentFlowCommand;
+      flowButton.disabled = commandPending || !currentFlowCommand;
       flowButton.dataset.command = currentFlowCommand || '';
       document.getElementById('recovery').textContent =
         d.phase === 'Recovery'
@@ -305,13 +307,15 @@ async function refresh() {
       document.getElementById('instruction').textContent = instruction;
 
       const gameBusy = !!d.tetris_running || !!d.tetris_countdown;
-      document.getElementById('lock').disabled = d.state !== 'Ready' || gameBusy;
+      document.getElementById('lock').disabled = commandPending || d.state !== 'Ready' || gameBusy;
       const disableConditions = gameBusy || !!d.participant_id;
       document.getElementById('c1').disabled = disableConditions;
       document.getElementById('c2').disabled = disableConditions;
       document.getElementById('c3').disabled = disableConditions;
       document.getElementById('rescan').disabled = gameBusy;
     } else {
+      document.getElementById('flowAction').disabled = true;
+      document.getElementById('flowAction').dataset.command = '';
       document.getElementById('lock').disabled = true;
       document.getElementById('instruction').textContent =
         'Searching automatically. Headset and laptop must be on a network that allows local device communication.';
@@ -543,15 +547,26 @@ def send_command(command):
         address = headset_address
 
     if not address:
-        return False
+        return 503, {"ok": False, "message": "Headset is not connected."}
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.sendto(command.encode("utf-8"), (address, COMMAND_PORT))
-    finally:
-        sock.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect((address, COMMAND_PORT))
+            sock.settimeout(2.0)
+            sock.send(command.encode("utf-8"))
+            if command not in CONFIRMED_COMMANDS:
+                return 200, {"ok": True, "message": f"Command sent: {command}"}
+            reply = json.loads(sock.recv(4096).decode("utf-8"))
+            if not isinstance(reply.get("ok"), bool) or not isinstance(reply.get("message"), str):
+                raise ValueError("Invalid command reply")
+            return 200, reply
+    except socket.timeout:
+        return 504, {"ok": False, "message": "No headset confirmation. Check the current step and connection."}
+    except OSError:
+        return 503, {"ok": False, "message": "Headset connection unavailable."}
+    except (ValueError, AttributeError):
+        return 502, {"ok": False, "message": "Invalid confirmation from headset."}
 
-    return True
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -603,9 +618,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(400)
             return
 
-        ok = send_command(command)
-        body = json.dumps({"ok": ok}).encode("utf-8")
-        self.send_response(200 if ok else 503)
+        status_code, result = send_command(command)
+        body = json.dumps(result).encode("utf-8")
+        self.send_response(status_code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()

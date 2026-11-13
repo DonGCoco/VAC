@@ -145,29 +145,30 @@ namespace VACExperiment.Board
 
         public void LockBoardPose()
         {
+            string error = TryLockBoardPose();
+            if (error != null)
+                Debug.LogWarning(error);
+        }
+
+        public string TryLockBoardPose()
+        {
             RefreshMeasurement();
+            if (CurrentState == BoardDistanceState.WaitingForMarker ||
+                !boardRegistration.HasRecentMarkerObservation(config.markerVisibilityGraceSeconds))
+                return "QR tracking lost. Bring the marker back into view.";
+            if (CurrentState == BoardDistanceState.TooClose || CurrentState == BoardDistanceState.TooFar)
+                return $"Distance out of range: {ActualDistanceMeters:F3} m (target {TargetDistanceMeters:F2} m).";
             if (CurrentState != BoardDistanceState.Ready)
-            {
-                Debug.LogWarning(
-                    "M2 board pose can only be locked while the selected condition is READY.");
-                return;
-            }
-
-            if (!boardRegistration.HasRecentMarkerObservation(config.markerVisibilityGraceSeconds))
-            {
-                Debug.LogWarning(
-                    "M2 board pose lock rejected because the QR marker is not currently reliable.");
-                return;
-            }
-
+                return $"Cannot lock while calibration is {CurrentState}.";
             if (!boardRegistration.LockCurrentBoardPose())
-                return;
+                return "Board pose unavailable. Rescan the QR marker.";
 
             LockedDistanceMeters = ActualDistanceMeters;
             CurrentState = BoardDistanceState.Locked;
             Debug.Log(
                 $"M2 board distance locked: condition={CurrentCondition}; " +
                 $"actual={LockedDistanceMeters:F3} m.");
+            return null;
         }
 
         public void RescanBoard()

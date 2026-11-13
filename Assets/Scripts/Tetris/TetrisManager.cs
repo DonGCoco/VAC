@@ -59,6 +59,7 @@ namespace VACExperiment.Tetris
         private float countdownStartedAt;
         private float gravityElapsed;
         private TextMesh countdownText;
+        private TextMesh statsText;
         public float FallIntervalSeconds => Mathf.Max(0.05f, config != null ? config.tetrisFallIntervalSeconds : 1f);
 
         // Compatibility entry point for the old two-condition flow.
@@ -161,6 +162,7 @@ namespace VACExperiment.Tetris
                 inputEnabledTime = Time.unscaledTime + startInputGuardSeconds;
                 IsRunning = true;
                 SpawnNextPiece();
+                ShowStats();
                 onSessionStarted?.Invoke();
                 Debug.Log($"Pilot Tetris running: sequence={sequenceId}; fallInterval={FallIntervalSeconds:F3}s (candidate).");
                 return; // No gravity or sampling charged to the countdown frame.
@@ -219,6 +221,47 @@ namespace VACExperiment.Tetris
             if (countdownText != null) countdownText.gameObject.SetActive(false);
         }
 
+        private void ShowStats()
+        {
+            if (statsText == null)
+            {
+                var label = new GameObject("TetrisStats");
+                label.transform.SetParent(board.transform, false);
+                label.transform.localPosition = new Vector3(
+                    0f, -board.Height * board.CellSize * 0.5f - board.CellSize, 0f);
+                statsText = label.AddComponent<TextMesh>();
+                statsText.anchor = TextAnchor.UpperCenter;
+                statsText.alignment = TextAlignment.Center;
+                statsText.fontSize = 48;
+                statsText.characterSize = 0.004f;
+            }
+
+            var viewer = Camera.main;
+            if (viewer != null)
+            {
+                // TextMesh faces its local -Z direction; keep it in the board plane.
+                bool viewerOnPositiveSide = Vector3.Dot(
+                    viewer.transform.position - board.transform.position, board.transform.forward) > 0f;
+                statsText.transform.localRotation = viewerOnPositiveSide
+                    ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity;
+            }
+
+            UpdateStats();
+            statsText.gameObject.SetActive(true);
+        }
+
+        private void UpdateStats()
+        {
+            if (statsText != null)
+                statsText.text = $"Board resets: {topOuts}    Lines cleared: {linesCleared}";
+        }
+
+        private void HideStats()
+        {
+            if (statsText != null)
+                statsText.gameObject.SetActive(false);
+        }
+
         public void CancelSession()
         {
             if (!IsBusy) return;
@@ -228,6 +271,7 @@ namespace VACExperiment.Tetris
             RemainingSeconds = 0f;
             gravityElapsed = 0f;
             HideCountdown();
+            HideStats();
             if (activePiece != null) Destroy(activePiece.gameObject);
             activePiece = null;
             if (dataLogger != null && dataLogger.HasSession)
@@ -240,6 +284,7 @@ namespace VACExperiment.Tetris
         private void OnDestroy()
         {
             if (countdownText != null) Destroy(countdownText.gameObject);
+            if (statsText != null) Destroy(statsText.gameObject);
         }
 
         private void SampleViewingDistance()
@@ -331,6 +376,7 @@ namespace VACExperiment.Tetris
             }
 
             SpawnNextPiece();
+            UpdateStats();
         }
 
         private bool CanAcceptInput()
@@ -366,6 +412,7 @@ namespace VACExperiment.Tetris
         private void EndSession()
         {
             IsRunning = false;
+            HideStats();
 
             if (activePiece != null)
             {

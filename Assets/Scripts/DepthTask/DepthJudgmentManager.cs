@@ -23,8 +23,8 @@ namespace VACExperiment
     /// Fixed-depth judgement task.
     ///
     /// This task is deliberately independent from the physical BoardAnchor.
-    /// Each trial is placed in world space from the participant's viewer pose at
-    /// trial onset, then remains fixed until the response.
+    /// The block frame is placed in world space from the viewer pose at block onset.
+    /// Each side keeps the same lateral position and height within the block.
     /// </summary>
     public class DepthJudgmentManager : MonoBehaviour
     {
@@ -65,7 +65,7 @@ namespace VACExperiment
         private GameObject promptObject;
         private TextMesh promptText;
         private Vector3 responseOrigin, responseRight, responseUp, responseForward;
-        private Vector3 trialEyePosition, leftSphereCenter, rightSphereCenter;
+        private Vector3 blockEyePosition, leftSphereCenter, rightSphereCenter;
         private float leftSphereRadius, rightSphereRadius;
         private Vector3[] leftVisibleVertices, rightVisibleVertices;
         private float leftInnerEdge, rightInnerEdge;
@@ -241,7 +241,6 @@ namespace VACExperiment
 
         private void CaptureResponseGeometry()
         {
-            trialEyePosition = viewer.position;
             leftSphereCenter = leftTarget.position;
             rightSphereCenter = rightTarget.position;
             leftVisibleVertices = CaptureVisibleVertices(leftTarget);
@@ -249,7 +248,7 @@ namespace VACExperiment
             Vector3 ls = leftTarget.lossyScale, rs = rightTarget.lossyScale;
             leftSphereRadius = Mathf.Max(Mathf.Abs(ls.x), Mathf.Max(Mathf.Abs(ls.y), Mathf.Abs(ls.z))) * 0.5f;
             rightSphereRadius = Mathf.Max(Mathf.Abs(rs.x), Mathf.Max(Mathf.Abs(rs.y), Mathf.Abs(rs.z))) * 0.5f;
-            responseGeometryValid = TryProjectedGap(trialEyePosition, out leftInnerEdge, out rightInnerEdge);
+            responseGeometryValid = TryProjectedGap(blockEyePosition, out leftInnerEdge, out rightInnerEdge);
             Debug.Log($"Pilot depth geometry v2: trial={trialIndex + 1}; plane={responseOrigin:F4}; " +
                 $"leftInner={leftInnerEdge:F6}; rightInner={rightInnerEdge:F6}; " +
                 $"radii={leftSphereRadius:F6}/{rightSphereRadius:F6}; valid={responseGeometryValid}; " +
@@ -387,6 +386,11 @@ namespace VACExperiment
 
             // Fixed outcome task: the same depths are used after every VAC block.
             referenceDepth = config.depthTaskReferenceDistanceMeters;
+            blockEyePosition = viewer.position;
+            responseForward = viewer.forward.normalized;
+            responseRight = viewer.right.normalized;
+            responseUp = viewer.up.normalized;
+            responseOrigin = blockEyePosition + responseForward * referenceDepth;
 
             fartherSides = BuildBalancedOrder(trialCount);
             trialIndex = 0;
@@ -395,7 +399,7 @@ namespace VACExperiment
             Debug.Log(
                 $"M5 depth task started: condition={CurrentCondition}; phase={phase}; " +
                 $"trials={trialCount}; near={GetNearDepth():F3} m; far={GetFarDepth():F3} m; " +
-                "reference=viewer-at-trial-onset; BoardAnchor=unused.");
+                "reference=viewer-at-block-onset; BoardAnchor=unused.");
 
             ShowTrial();
         }
@@ -464,8 +468,6 @@ namespace VACExperiment
         {
             ResponseSide fartherSide = fartherSides[trialIndex];
 
-            Vector3 forward = viewer.forward.normalized;
-            Vector3 right = viewer.right.normalized;
             float halfSeparation = config.targetHorizontalSeparationMeters * 0.5f;
 
             float nearDepth = GetNearDepth();
@@ -474,18 +476,12 @@ namespace VACExperiment
             float leftDepth = fartherSide == ResponseSide.Left ? farDepth : nearDepth;
             float rightDepth = fartherSide == ResponseSide.Right ? farDepth : nearDepth;
 
-            // Capture the viewer pose once at trial onset. The targets are world-fixed
-            // for the rest of that trial and do not follow subsequent head movement.
+            // Keep the block frame fixed; only the assigned near/far depths change.
             leftTarget.position =
-                viewer.position + forward * leftDepth - right * halfSeparation;
-
+                blockEyePosition + responseForward * leftDepth - responseRight * halfSeparation;
             rightTarget.position =
-                viewer.position + forward * rightDepth + right * halfSeparation;
+                blockEyePosition + responseForward * rightDepth + responseRight * halfSeparation;
 
-            responseOrigin = viewer.position + forward * referenceDepth;
-            responseRight = right;
-            responseUp = viewer.up.normalized;
-            responseForward = forward;
             SetResponseHover(null);
 
             ApplyConstantAngularSize(leftTarget, leftReferenceScale, leftDepth);

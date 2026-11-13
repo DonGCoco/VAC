@@ -96,6 +96,9 @@ namespace VACExperiment.EditorTools
                 viewer.SetPositionAndRotation(new Vector3(3, 2, 1), Quaternion.Euler(10, 50, 0));
                 Check(!Side(.1f) && left.position == leftPosition && right.position == rightPosition,
                     "unsafe eye pose rejected; plane and spheres remain world-fixed");
+                Call(manager, "ShowTrial");
+                Check(left.position == leftPosition && right.position == rightPosition,
+                    "next trial keeps the original block pose after the viewer moves");
                 manager.SetResponseHover(ResponseSide.Left);
                 Check(Get<TextMesh>(manager, "promptText").text.EndsWith("LEFT"), "left hover text");
                 manager.SetResponseHover(ResponseSide.Right);
