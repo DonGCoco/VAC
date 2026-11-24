@@ -506,7 +506,7 @@ namespace VACExperiment
         }
 
 
-        private const string DiagnosticPackage = "com.vacexperiment.depthdiagnostic";
+        private const string DiagnosticPackage = "com.vacexperiment.brightnessdiagnostic";
         private bool IsDepthDiagnostic => Application.identifier == DiagnosticPackage;
         private float? diagnosticDepthDifference;
         private const int DiagnosticTrials = 8;
@@ -515,7 +515,7 @@ namespace VACExperiment
         {
             if (config == null || viewer == null || leftTarget == null || rightTarget == null)
             {
-                Debug.LogError("VACDepthDiagnostic: the Pilot scene is missing the camera, config or targets.");
+                Debug.LogError("VACBrightnessDiagnostic: the Pilot scene is missing the camera, config or targets.");
                 yield break;
             }
 
@@ -524,7 +524,7 @@ namespace VACExperiment
             var controller = MagicLeap.Examples.MagicLeapController.Instance;
             if (controller == null)
             {
-                Debug.LogError("VACDepthDiagnostic: Magic Leap controller unavailable.");
+                Debug.LogError("VACBrightnessDiagnostic: Magic Leap controller unavailable.");
                 yield break;
             }
 
@@ -536,30 +536,42 @@ namespace VACExperiment
 
             referenceDepth = config.depthTaskReferenceDistanceMeters;
             float baseline = config.depthDifferenceMeters;
-            // Four times the Pilot difference, capped to keep both targets in front.
-            float larger = Mathf.Min(baseline * 4f, referenceDepth);
-            if (baseline <= 0f || larger <= baseline)
+            if (baseline <= 0f || baseline >= 2f * referenceDepth)
             {
-                Debug.LogError("VACDepthDiagnostic: invalid Pilot reference depth or depth difference.");
+                Debug.LogError("VACBrightnessDiagnostic: invalid Pilot depth configuration.");
                 yield break;
             }
 
-            var leftLabel = CreateDiagnosticLabel("DiagnosticDepthLeft");
-            var rightLabel = CreateDiagnosticLabel("DiagnosticDepthRight");
-            SetPromptVisible(true);
-
-            for (int group = 0; group < 4; group++)
+            var shader = Resources.Load<Shader>("VacBrightnessUnlit");
+            if (shader == null || !shader.isSupported)
             {
-                bool showNumbers = group >= 2;
-                diagnosticDepthDifference = group % 2 == 0 ? baseline : larger;
-                promptText.text = $"Depth check {group + 1}/4\nFace forward, then press trigger";
-                yield return WaitForDiagnosticTrigger(controller);
+                Debug.LogError("VACBrightnessDiagnostic: Unlit shader unavailable.");
+                yield break;
+            }
 
-                blockEyePosition = viewer.position;
-                responseForward = viewer.forward.normalized;
-                responseRight = viewer.right.normalized;
-                responseUp = viewer.up.normalized;
-                responseOrigin = blockEyePosition + responseForward * referenceDepth;
+            var sharedMaterial = new Material(shader);
+            SetPromptVisible(true);
+            promptText.text = "Face a uniform wall and press trigger";
+            yield return WaitForDiagnosticTrigger(controller);
+
+            // Use one placement frame for all groups.
+            blockEyePosition = viewer.position;
+            responseForward = viewer.forward.normalized;
+            responseRight = viewer.right.normalized;
+            responseUp = viewer.up.normalized;
+            responseOrigin = blockEyePosition + responseForward * referenceDepth;
+
+            for (int group = 0; group < 3; group++)
+            {
+                bool equalDepth = group == 1;
+                if (equalDepth)
+                {
+                    ApplyBrightnessMaterial(leftTarget, sharedMaterial);
+                    ApplyBrightnessMaterial(rightTarget, sharedMaterial);
+                }
+                diagnosticDepthDifference = equalDepth ? 0f : baseline;
+                promptText.text = $"Brightness check {group + 1}/3\nPress trigger to begin";
+                yield return WaitForDiagnosticTrigger(controller);
                 fartherSides = BuildBalancedOrder(DiagnosticTrials);
 
                 for (trialIndex = 0; trialIndex < DiagnosticTrials; trialIndex++)
@@ -571,24 +583,17 @@ namespace VACExperiment
                     float left = Vector3.Dot(leftTarget.position - blockEyePosition, responseForward);
                     float right = Vector3.Dot(rightTarget.position - blockEyePosition, responseForward);
                     Debug.Log(FormattableString.Invariant(
-                        $"VACDepthDiagnostic group={group + 1} trial={trialIndex + 1} planned={fartherSides[trialIndex]} left_m={left:F4} right_m={right:F4}"));
+                        $"VACBrightnessDiagnostic group={group + 1} trial={trialIndex + 1} farther={(equalDepth ? "Equal" : fartherSides[trialIndex].ToString())} left_m={left:F4} right_m={right:F4}"));
 
-                    if (showNumbers)
-                    {
-                        PositionDiagnosticLabel(leftLabel, leftTarget, left);
-                        PositionDiagnosticLabel(rightLabel, rightTarget, right);
-                    }
-
-                    promptText.text = $"{group + 1}/4  ·  {trialIndex + 1}/8\nSay which is farther and which is darker\nPress trigger after answering";
+                    promptText.text = $"{group + 1}/3  ·  {trialIndex + 1}/8\nSay: left darker, right darker, or equal\nPress trigger after answering";
                     yield return WaitForDiagnosticTrigger(controller);
                     SetTargetsVisible(false);
-                    leftLabel.gameObject.SetActive(false);
-                    rightLabel.gameObject.SetActive(false);
                 }
             }
 
+            Destroy(sharedMaterial);
             diagnosticDepthDifference = null;
-            promptText.text = "Depth check complete";
+            promptText.text = "Brightness check complete";
         }
 
         private static System.Collections.IEnumerator WaitForDiagnosticTrigger(
@@ -598,30 +603,21 @@ namespace VACExperiment
             yield return new WaitUntil(() => controller.IsTracked && controller.TriggerIsPressed);
         }
 
-        private TextMesh CreateDiagnosticLabel(string objectName)
+        private static void ApplyBrightnessMaterial(Transform target, Material material)
         {
-            var label = new GameObject(objectName).AddComponent<TextMesh>();
-            label.transform.SetParent(transform, false);
-            label.anchor = TextAnchor.MiddleCenter;
-            label.alignment = TextAlignment.Center;
-            label.fontSize = 48;
-            label.characterSize = 0.003f;
-            label.gameObject.SetActive(false);
-            return label;
-        }
-
-        private void PositionDiagnosticLabel(TextMesh label, Transform target, float depth)
-        {
-            label.text = depth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + " m";
-            // Project labels onto a common plane so the text itself adds no stereo depth cue.
-            Vector3 relative = target.position - blockEyePosition;
-            float scale = referenceDepth / depth;
-            float lateral = Vector3.Dot(relative, responseRight) * scale;
-            float vertical = Vector3.Dot(relative, responseUp) * scale;
-            label.transform.SetPositionAndRotation(
-                responseOrigin + responseRight * lateral + responseUp * (vertical - 0.09f),
-                Quaternion.LookRotation(responseForward, responseUp));
-            label.gameObject.SetActive(true);
+            foreach (var renderer in target.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                var materials = renderer.sharedMaterials;
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    materials[i] = material;
+                    renderer.SetPropertyBlock(null, i);
+                }
+                renderer.SetPropertyBlock(null);
+                renderer.sharedMaterials = materials;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
         }
 
         private float GetNearDepth()
