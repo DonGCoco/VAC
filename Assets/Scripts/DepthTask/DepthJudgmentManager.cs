@@ -549,6 +549,12 @@ namespace VACExperiment
                 yield break;
             }
 
+            string csvPath = System.IO.Path.Combine(Application.persistentDataPath,
+                $"brightness_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}.csv");
+            if (!AppendBrightnessCsv(csvPath,
+                "group,trial,material,depth_difference_m,left_m,right_m,farther_side,darker_response"))
+                yield break;
+
             var sharedMaterial = new Material(shader);
             SetPromptVisible(true);
             promptText.text = "Face a uniform wall and press trigger";
@@ -582,18 +588,55 @@ namespace VACExperiment
 
                     float left = Vector3.Dot(leftTarget.position - blockEyePosition, responseForward);
                     float right = Vector3.Dot(rightTarget.position - blockEyePosition, responseForward);
-                    Debug.Log(FormattableString.Invariant(
-                        $"VACBrightnessDiagnostic group={group + 1} trial={trialIndex + 1} farther={(equalDepth ? "Equal" : fartherSides[trialIndex].ToString())} left_m={left:F4} right_m={right:F4}"));
-
-                    promptText.text = $"{group + 1}/4  ·  {trialIndex + 1}/8\nSay: left darker, right darker, or equal\nPress trigger after answering";
+                    promptText.text = $"{group + 1}/4  ·  {trialIndex + 1}/8\nCompare brightness, then press trigger";
                     yield return WaitForDiagnosticTrigger(controller);
                     SetTargetsVisible(false);
+
+                    // Keep the answer screen out of the brightness comparison.
+                    Vector3 answerForward = viewer.forward;
+                    Vector3 answerRight = viewer.right;
+                    string answer = "Equal";
+                    bool released = false;
+                    while (true)
+                    {
+                        float angle = Mathf.Atan2(Vector3.Dot(viewer.forward, answerRight),
+                            Vector3.Dot(viewer.forward, answerForward)) * Mathf.Rad2Deg;
+                        answer = angle < -8f ? "Left" : angle > 8f ? "Right" : "Equal";
+                        string selection = answer == "Equal" ? "Equal brightness" : $"{answer} darker";
+                        promptText.text = $"Turn head left / center / right\nSelected: {selection}\nPress trigger to save";
+                        if (controller.IsTracked)
+                        {
+                            if (!controller.TriggerIsPressed)
+                                released = true;
+                            else if (released)
+                                break;
+                        }
+                        else
+                        {
+                            released = false;
+                        }
+                        yield return null;
+                    }
+
+                    string material = group < 2 ? "Pilot" : "Unlit";
+                    string farther = equalDepth ? "Equal" : fartherSides[trialIndex].ToString();
+                    string row = FormattableString.Invariant(
+                        $"{group + 1},{trialIndex + 1},{material},{diagnosticDepthDifference.Value:F4},{left:F4},{right:F4},{farther},{answer}");
+                    if (!AppendBrightnessCsv(csvPath, row))
+                    {
+                        promptText.text = "Could not save CSV. Check Unity log.";
+                        Destroy(sharedMaterial);
+                        diagnosticDepthDifference = null;
+                        yield break;
+                    }
+                    Debug.Log($"VACBrightnessDiagnosticCSV {row}");
                 }
             }
 
             Destroy(sharedMaterial);
             diagnosticDepthDifference = null;
-            promptText.text = "Brightness check complete";
+            promptText.text = "Brightness check complete\nCSV saved";
+            Debug.Log($"VACBrightnessDiagnostic saved {csvPath}");
         }
 
         private static System.Collections.IEnumerator WaitForDiagnosticTrigger(
@@ -601,6 +644,25 @@ namespace VACExperiment
         {
             yield return new WaitUntil(() => controller.IsTracked && !controller.TriggerIsPressed);
             yield return new WaitUntil(() => controller.IsTracked && controller.TriggerIsPressed);
+        }
+
+        private static bool AppendBrightnessCsv(string path, string row)
+        {
+            try
+            {
+                System.IO.File.AppendAllText(path, row + "\n");
+                return true;
+            }
+            catch (System.IO.IOException exception)
+            {
+                Debug.LogError($"VACBrightnessDiagnostic: {exception.Message}");
+                return false;
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                Debug.LogError($"VACBrightnessDiagnostic: {exception.Message}");
+                return false;
+            }
         }
 
         private static void ApplyBrightnessMaterial(Transform target, Material material)
