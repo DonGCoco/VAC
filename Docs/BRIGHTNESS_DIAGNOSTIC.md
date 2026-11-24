@@ -11,10 +11,12 @@ Face a uniform wall and set the viewing direction once with the trigger. Stay in
 | 3 | Shared opaque gray Unlit | 0 cm |
 | 4 | Shared opaque gray Unlit | Pilot setting (6 cm) |
 
-Call out left darker, right darker, or equal before pressing the trigger. Have the operator record the response by group and trial number. Inspect the geometry log after the test to avoid revealing the far side.
+Compare the two balls, then press the trigger to hide them. On the answer screen, turn your head left or right to select the darker side, or keep it centered for equal brightness. The prompt shows the selection. Press the trigger again to save the answer, then face the original wall marker before the next comparison.
+
+Each saved trial is appended to `brightness_*.csv` in the headset app's persistent-data directory. With the headset connected:
 
 ```bash
-adb logcat -d -s Unity | grep 'VACBrightnessDiagnostic group='
+adb pull /sdcard/Android/data/com.vacexperiment.brightnessdiagnostic/files/ ./brightness-results/
 ```
 
 Compare the darker side with the logged farther side in groups 2 and 4. Groups 1 and 3 check for a fixed side bias at equal depth. Group order is fixed for debugging; these runs are not formal experiment sessions.
