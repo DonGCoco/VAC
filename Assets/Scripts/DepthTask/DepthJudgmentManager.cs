@@ -561,16 +561,16 @@ namespace VACExperiment
             responseUp = viewer.up.normalized;
             responseOrigin = blockEyePosition + responseForward * referenceDepth;
 
-            for (int group = 0; group < 3; group++)
+            for (int group = 0; group < 4; group++)
             {
-                bool equalDepth = group == 1;
-                if (equalDepth)
+                bool equalDepth = group % 2 == 0;
+                if (group == 2)
                 {
                     ApplyBrightnessMaterial(leftTarget, sharedMaterial);
                     ApplyBrightnessMaterial(rightTarget, sharedMaterial);
                 }
                 diagnosticDepthDifference = equalDepth ? 0f : baseline;
-                promptText.text = $"Brightness check {group + 1}/3\nPress trigger to begin";
+                promptText.text = $"Brightness check {group + 1}/4\nPress trigger to begin";
                 yield return WaitForDiagnosticTrigger(controller);
                 fartherSides = BuildBalancedOrder(DiagnosticTrials);
 
@@ -585,7 +585,7 @@ namespace VACExperiment
                     Debug.Log(FormattableString.Invariant(
                         $"VACBrightnessDiagnostic group={group + 1} trial={trialIndex + 1} farther={(equalDepth ? "Equal" : fartherSides[trialIndex].ToString())} left_m={left:F4} right_m={right:F4}"));
 
-                    promptText.text = $"{group + 1}/3  ·  {trialIndex + 1}/8\nSay: left darker, right darker, or equal\nPress trigger after answering";
+                    promptText.text = $"{group + 1}/4  ·  {trialIndex + 1}/8\nSay: left darker, right darker, or equal\nPress trigger after answering";
                     yield return WaitForDiagnosticTrigger(controller);
                     SetTargetsVisible(false);
                 }
