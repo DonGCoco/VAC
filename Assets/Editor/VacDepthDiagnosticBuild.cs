@@ -6,7 +6,7 @@ using UnityEngine;
 
 internal static class VacDepthDiagnosticBuild
 {
-    [MenuItem("VAC/Build Depth Diagnostic APK")]
+    [MenuItem("VAC/Build Brightness Diagnostic APK")]
     private static void Build()
     {
         var scene = EditorSceneManager.GetActiveScene();
@@ -15,7 +15,7 @@ internal static class VacDepthDiagnosticBuild
             Object.FindObjectsByType<VACExperiment.DepthJudgmentManager>(
                 FindObjectsSortMode.None).Length != 1)
         {
-            EditorUtility.DisplayDialog("VAC Depth Diagnostic",
+            EditorUtility.DisplayDialog("VAC Brightness Diagnostic",
                 "Switch the build target to Android and open the saved Pilot scene with one active DepthJudgmentManager.",
                 "OK");
             return;
@@ -23,7 +23,7 @@ internal static class VacDepthDiagnosticBuild
 
         string folder = Path.GetFullPath("Builds");
         Directory.CreateDirectory(folder);
-        string apk = Path.Combine(folder, "VAC-Depth-Diagnostic.apk");
+        string apk = Path.Combine(folder, "VAC-Brightness-Diagnostic.apk");
         var target = UnityEditor.Build.NamedBuildTarget.Android;
         string previousId = PlayerSettings.GetApplicationIdentifier(target);
         string previousName = PlayerSettings.productName;
@@ -31,8 +31,8 @@ internal static class VacDepthDiagnosticBuild
         try
         {
             EditorUserBuildSettings.buildAppBundle = false;
-            PlayerSettings.SetApplicationIdentifier(target, "com.vacexperiment.depthdiagnostic");
-            PlayerSettings.productName = "VAC Depth Diagnostic";
+            PlayerSettings.SetApplicationIdentifier(target, "com.vacexperiment.brightnessdiagnostic");
+            PlayerSettings.productName = "VAC Brightness Diagnostic";
             var result = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = new[] { scene.path },
