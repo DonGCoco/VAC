@@ -96,6 +96,15 @@ namespace VACExperiment
 
         private void Start()
         {
+            if (IsDepthDiagnostic)
+            {
+                var existingInput = GetComponent<MagicLeapDepthInput>();
+                if (existingInput != null)
+                    existingInput.enabled = false;
+                StartCoroutine(RunDepthDiagnostic());
+                return;
+            }
+
             var responseInput = GetComponent<MagicLeapDepthInput>();
             if (responseInput == null)
                 responseInput = gameObject.AddComponent<MagicLeapDepthInput>();
@@ -322,6 +331,7 @@ namespace VACExperiment
 
         public void SetMilestone5AutoStartEnabled(bool enabled)
         {
+            enabled = enabled && !IsDepthDiagnostic;
             autoStartAfterTetrisForMilestone5 = enabled;
 
             if (tetrisManager == null)
@@ -337,12 +347,14 @@ namespace VACExperiment
 
         public void BeginPractice(VacLevel practiceCondition)
         {
-            BeginBlock(practiceCondition, DepthPhase.Practice, config.practiceDepthTrials);
+            if (!IsDepthDiagnostic)
+                BeginBlock(practiceCondition, DepthPhase.Practice, config.practiceDepthTrials);
         }
 
         public void BeginFormal(VacLevel exposureCondition)
         {
-            BeginBlock(exposureCondition, DepthPhase.Post, config.formalDepthTrials);
+            if (!IsDepthDiagnostic)
+                BeginBlock(exposureCondition, DepthPhase.Post, config.formalDepthTrials);
         }
 
         // Compatibility overloads for the old two-condition flow until M6 replaces it.
@@ -493,14 +505,133 @@ namespace VACExperiment
             stimulusOnsetTime = Time.realtimeSinceStartup;
         }
 
+
+        private const string DiagnosticPackage = "com.vacexperiment.depthdiagnostic";
+        private bool IsDepthDiagnostic => Application.identifier == DiagnosticPackage;
+        private float? diagnosticDepthDifference;
+        private const int DiagnosticTrials = 8;
+
+        private System.Collections.IEnumerator RunDepthDiagnostic()
+        {
+            if (config == null || viewer == null || leftTarget == null || rightTarget == null)
+            {
+                Debug.LogError("VACDepthDiagnostic: the Pilot scene is missing the camera, config or targets.");
+                yield break;
+            }
+
+            // Wait for the scene and tracking to initialize before asking the operator to start.
+            yield return null;
+            var controller = MagicLeap.Examples.MagicLeapController.Instance;
+            if (controller == null)
+            {
+                Debug.LogError("VACDepthDiagnostic: Magic Leap controller unavailable.");
+                yield break;
+            }
+
+            if (tetrisManager != null)
+            {
+                foreach (Renderer renderer in tetrisManager.GetComponentsInChildren<Renderer>(true))
+                    renderer.enabled = false;
+            }
+
+            referenceDepth = config.depthTaskReferenceDistanceMeters;
+            float baseline = config.depthDifferenceMeters;
+            // Four times the Pilot difference, capped to keep both targets in front.
+            float larger = Mathf.Min(baseline * 4f, referenceDepth);
+            if (baseline <= 0f || larger <= baseline)
+            {
+                Debug.LogError("VACDepthDiagnostic: invalid Pilot reference depth or depth difference.");
+                yield break;
+            }
+
+            var leftLabel = CreateDiagnosticLabel("DiagnosticDepthLeft");
+            var rightLabel = CreateDiagnosticLabel("DiagnosticDepthRight");
+            SetPromptVisible(true);
+
+            for (int group = 0; group < 4; group++)
+            {
+                bool showNumbers = group >= 2;
+                diagnosticDepthDifference = group % 2 == 0 ? baseline : larger;
+                promptText.text = $"Depth check {group + 1}/4\nFace forward, then press trigger";
+                yield return WaitForDiagnosticTrigger(controller);
+
+                blockEyePosition = viewer.position;
+                responseForward = viewer.forward.normalized;
+                responseRight = viewer.right.normalized;
+                responseUp = viewer.up.normalized;
+                responseOrigin = blockEyePosition + responseForward * referenceDepth;
+                fartherSides = BuildBalancedOrder(DiagnosticTrials);
+
+                for (trialIndex = 0; trialIndex < DiagnosticTrials; trialIndex++)
+                {
+                    promptText.text = "";
+                    yield return new WaitForSecondsRealtime(0.5f);
+                    ShowTrial();
+
+                    float left = Vector3.Dot(leftTarget.position - blockEyePosition, responseForward);
+                    float right = Vector3.Dot(rightTarget.position - blockEyePosition, responseForward);
+                    Debug.Log(FormattableString.Invariant(
+                        $"VACDepthDiagnostic group={group + 1} trial={trialIndex + 1} planned={fartherSides[trialIndex]} left_m={left:F4} right_m={right:F4}"));
+
+                    if (showNumbers)
+                    {
+                        PositionDiagnosticLabel(leftLabel, leftTarget, left);
+                        PositionDiagnosticLabel(rightLabel, rightTarget, right);
+                    }
+
+                    promptText.text = $"{group + 1}/4  ·  {trialIndex + 1}/8\nSay which is farther and which is darker\nPress trigger after answering";
+                    yield return WaitForDiagnosticTrigger(controller);
+                    SetTargetsVisible(false);
+                    leftLabel.gameObject.SetActive(false);
+                    rightLabel.gameObject.SetActive(false);
+                }
+            }
+
+            diagnosticDepthDifference = null;
+            promptText.text = "Depth check complete";
+        }
+
+        private static System.Collections.IEnumerator WaitForDiagnosticTrigger(
+            MagicLeap.Examples.MagicLeapController controller)
+        {
+            yield return new WaitUntil(() => controller.IsTracked && !controller.TriggerIsPressed);
+            yield return new WaitUntil(() => controller.IsTracked && controller.TriggerIsPressed);
+        }
+
+        private TextMesh CreateDiagnosticLabel(string objectName)
+        {
+            var label = new GameObject(objectName).AddComponent<TextMesh>();
+            label.transform.SetParent(transform, false);
+            label.anchor = TextAnchor.MiddleCenter;
+            label.alignment = TextAlignment.Center;
+            label.fontSize = 48;
+            label.characterSize = 0.003f;
+            label.gameObject.SetActive(false);
+            return label;
+        }
+
+        private void PositionDiagnosticLabel(TextMesh label, Transform target, float depth)
+        {
+            label.text = depth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + " m";
+            // Project labels onto a common plane so the text itself adds no stereo depth cue.
+            Vector3 relative = target.position - blockEyePosition;
+            float scale = referenceDepth / depth;
+            float lateral = Vector3.Dot(relative, responseRight) * scale;
+            float vertical = Vector3.Dot(relative, responseUp) * scale;
+            label.transform.SetPositionAndRotation(
+                responseOrigin + responseRight * lateral + responseUp * (vertical - 0.09f),
+                Quaternion.LookRotation(responseForward, responseUp));
+            label.gameObject.SetActive(true);
+        }
+
         private float GetNearDepth()
         {
-            return referenceDepth - config.depthDifferenceMeters * 0.5f;
+            return referenceDepth - (diagnosticDepthDifference ?? config.depthDifferenceMeters) * 0.5f;
         }
 
         private float GetFarDepth()
         {
-            return referenceDepth + config.depthDifferenceMeters * 0.5f;
+            return referenceDepth + (diagnosticDepthDifference ?? config.depthDifferenceMeters) * 0.5f;
         }
 
         private void ApplyConstantAngularSize(
